@@ -1,0 +1,23 @@
+{
+	"name": "voelpping",
+	"type": "module",
+	"private": true,
+	"scripts": {
+		"dev": "wrangler dev",
+		"deploy": "wrangler d1 migrations apply voelpping --remote && wrangler deploy",
+		"check": "tsc --noEmit && biome check",
+		"db:generate": "drizzle-kit generate",
+		"db:migrate:local": "wrangler d1 migrations apply voelpping --local",
+		"db:migrate": "wrangler d1 migrations apply voelpping --remote"
+	},
+	"dependencies": {
+		"drizzle-orm": "^0.45.2"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.0.0",
+		"@cloudflare/workers-types": "^4.0.0",
+		"drizzle-kit": "^0.31.0",
+		"typescript": "^5.8.0",
+		"wrangler": "^4.0.0"
+	}
+}

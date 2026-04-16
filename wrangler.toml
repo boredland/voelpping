@@ -1,0 +1,30 @@
+name = "voelpping"
+main = "src/index.ts"
+compatibility_date = "2026-04-01"
+
+[observability]
+enabled = true
+
+[triggers]
+crons = ["0 7 * * *"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "voelpping"
+database_id = ""
+migrations_dir = "migrations"
+
+[[queues.producers]]
+binding = "NOTIFICATION_QUEUE"
+queue = "voelpping-notifications"
+
+[[queues.consumers]]
+queue = "voelpping-notifications"
+max_batch_size = 10
+max_retries = 3
+
+[vars]
+BOT_USERNAME = "voelpping_bot"
+
+[ai]
+binding = "AI"
