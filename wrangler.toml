@@ -2,6 +2,10 @@ name = "voelpping"
 main = "src/index.ts"
 compatibility_date = "2026-04-01"
 
+routes = [
+  { pattern = "voelp.jonas-strassel.de", custom_domain = true }
+]
+
 [observability]
 enabled = true
 
