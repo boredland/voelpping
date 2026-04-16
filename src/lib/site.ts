@@ -40,7 +40,6 @@ export async function renderSite(
 	function renderMealCell(value: string | null): string {
 		const items = parseMealItems(value);
 		if (items.length === 0) return "";
-		if (items.length === 1) return escapeHtml(items[0]);
 		return `<ul>${items.map((i) => `<li>${escapeHtml(i)}</li>`).join("")}</ul>`;
 	}
 
