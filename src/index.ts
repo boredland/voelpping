@@ -83,7 +83,13 @@ export default {
 
 		if (url.pathname === `/trigger/${env.TELEGRAM_BOT_TOKEN}`) {
 			const db = createDb(env.DB);
+			const force = url.searchParams.has("force");
 			try {
+				if (force) {
+					const weekTuesday = getCurrentWeekTuesday();
+					await db.delete(menus).where(eq(menus.weekStart, weekTuesday));
+					console.log(`Force: deleted menu for ${weekTuesday}`);
+				}
 				await scrapeAndStore(db, env);
 				const todayDow = getBerlinDayOfWeek();
 				if (todayDow >= 2 && todayDow <= 5) {
