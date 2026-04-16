@@ -81,6 +81,21 @@ export default {
 			return new Response("ok");
 		}
 
+		if (url.pathname === `/trigger/${env.TELEGRAM_BOT_TOKEN}`) {
+			const db = createDb(env.DB);
+			try {
+				await scrapeAndStore(db, env);
+				const todayDow = getBerlinDayOfWeek();
+				if (todayDow >= 2 && todayDow <= 5) {
+					await enqueueDailyNotifications(db, env, todayDow);
+				}
+				return new Response("triggered");
+			} catch (e) {
+				console.error("Manual trigger error:", e);
+				return new Response(`error: ${e}`, { status: 500 });
+			}
+		}
+
 		if (url.pathname === "/" || url.pathname === "") {
 			const db = createDb(env.DB);
 			return renderSite(db, env.BOT_USERNAME);
