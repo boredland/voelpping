@@ -150,19 +150,23 @@ export async function handleTelegramWebhook(
 
 		const m = menu[0];
 		const kw = getCalendarWeek(weekTuesday);
-		const dayNames = de ? DAY_NAMES_DE : DAY_NAMES_EN;
-		const lines = [
-			de ? `<b>Mittagstisch KW ${kw}</b>` : `<b>Lunch Menu CW ${kw}</b>`,
-			"",
-			m.tuesday ? `${dayNames[2]}: ${m.tuesday}` : null,
-			m.wednesday ? `${dayNames[3]}: ${m.wednesday}` : null,
-			m.thursday ? `${dayNames[4]}: ${m.thursday}` : null,
-			m.friday ? `${dayNames[5]}: ${m.friday}` : null,
-		]
-			.filter(Boolean)
+		const dn = de ? DAY_NAMES_DE : DAY_NAMES_EN;
+		const rows = [
+			m.tuesday ? [dn[2], m.tuesday] : null,
+			m.wednesday ? [dn[3], m.wednesday] : null,
+			m.thursday ? [dn[4], m.thursday] : null,
+			m.friday ? [dn[5], m.friday] : null,
+		].filter((r): r is [string, string] => r !== null);
+
+		const maxDay = Math.max(...rows.map(([d]) => d.length));
+		const header = de
+			? `<b>Mittagstisch KW ${kw}</b>`
+			: `<b>Lunch Menu CW ${kw}</b>`;
+		const table = rows
+			.map(([day, meal]) => `<code>${day.padEnd(maxDay)}</code>  ${meal}`)
 			.join("\n");
 
-		await reply(lines);
+		await reply(`${header}\n\n${table}`);
 		return;
 	}
 
