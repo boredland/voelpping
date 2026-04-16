@@ -11,7 +11,7 @@ crons = ["0 7 * * *"]
 [[d1_databases]]
 binding = "DB"
 database_name = "voelpping"
-database_id = ""
+database_id = "8fe5442d-94a7-4652-8001-bb2139ba96e7"
 migrations_dir = "migrations"
 
 [[queues.producers]]
@@ -24,7 +24,7 @@ max_batch_size = 10
 max_retries = 3
 
 [vars]
-BOT_USERNAME = "voelpping_bot"
+BOT_USERNAME = "voelp_bot"
 
 [ai]
 binding = "AI"
