@@ -84,25 +84,56 @@ export async function renderSite(
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="color-scheme" content="light dark">
 	<title>Mittagstisch – Metzgerei Völp</title>
+	<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍖</text></svg>">
 	<style>
+		:root {
+			--bg: #faf9f7;
+			--text: #333;
+			--text-muted: #666;
+			--card-bg: #fff;
+			--card-shadow: rgba(0,0,0,0.08);
+			--border: #eee;
+			--btn-bg: #333;
+			--btn-text: #fff;
+			--btn-border: #ccc;
+			--link-bg: #0088cc;
+			--link-bg-hover: #006da3;
+		}
+		@media (prefers-color-scheme: dark) {
+			:root {
+				--bg: #1a1a1a;
+				--text: #e0e0e0;
+				--text-muted: #999;
+				--card-bg: #262626;
+				--card-shadow: rgba(0,0,0,0.3);
+				--border: #333;
+				--btn-bg: #e0e0e0;
+				--btn-text: #1a1a1a;
+				--btn-border: #555;
+				--link-bg: #2a9fd6;
+				--link-bg-hover: #1d8abf;
+			}
+		}
 		* { box-sizing: border-box; margin: 0; padding: 0; }
-		body { font-family: system-ui, -apple-system, sans-serif; background: #faf9f7; color: #333; max-width: 640px; margin: 0 auto; padding: 1rem; }
+		body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); max-width: 640px; margin: 0 auto; padding: 1rem; }
 		h1 { font-size: 1.5rem; margin-bottom: 0.25rem; }
-		.subtitle { color: #666; margin-bottom: 1.5rem; }
+		.subtitle { color: var(--text-muted); margin-bottom: 1.5rem; }
 		.lang-toggle { text-align: right; margin-bottom: 1rem; }
-		.lang-toggle button { background: none; border: 1px solid #ccc; border-radius: 4px; padding: 0.25rem 0.5rem; cursor: pointer; font-size: 0.85rem; }
-		.lang-toggle button.active { background: #333; color: #fff; border-color: #333; }
-		section { background: #fff; border-radius: 8px; padding: 1.25rem; margin-bottom: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+		.lang-toggle button { background: none; border: 1px solid var(--btn-border); border-radius: 4px; padding: 0.25rem 0.5rem; cursor: pointer; font-size: 0.85rem; color: var(--text); }
+		.lang-toggle button.active { background: var(--btn-bg); color: var(--btn-text); border-color: var(--btn-bg); }
+		section { background: var(--card-bg); border-radius: 8px; padding: 1.25rem; margin-bottom: 1rem; box-shadow: 0 1px 3px var(--card-shadow); }
 		table { width: 100%; border-collapse: collapse; }
-		td { padding: 0.5rem 0; border-bottom: 1px solid #eee; }
+		td { padding: 0.5rem 0; border-bottom: 1px solid var(--border); }
 		td:first-child { font-weight: 600; white-space: nowrap; width: 120px; }
-		.subscribe-link { display: inline-block; background: #0088cc; color: #fff; text-decoration: none; padding: 0.75rem 1.5rem; border-radius: 6px; font-weight: 600; margin-top: 0.5rem; }
-		.subscribe-link:hover { background: #006da3; }
-		.empty { color: #999; font-style: italic; }
+		.subscribe-link { display: inline-block; background: var(--link-bg); color: #fff; text-decoration: none; padding: 0.75rem 1.5rem; border-radius: 6px; font-weight: 600; margin-top: 0.5rem; }
+		.subscribe-link:hover { background: var(--link-bg-hover); }
+		.empty { color: var(--text-muted); font-style: italic; }
 		h2 { font-size: 1.1rem; margin-bottom: 0.75rem; }
 		.history td { font-size: 0.85rem; }
-		footer { text-align: center; color: #999; font-size: 0.8rem; margin-top: 2rem; }
+		footer { text-align: center; color: var(--text-muted); font-size: 0.8rem; margin-top: 2rem; }
+		footer a { color: var(--text-muted); }
 		[lang="en"] { display: none; }
 		body.en [lang="de"] { display: none; }
 		body.en [lang="en"] { display: revert; }
