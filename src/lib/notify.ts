@@ -3,6 +3,7 @@ import type { Db } from "../db/client";
 import { menus, subscribers } from "../db/schema";
 import type { Env, NotificationMessage } from "../env";
 import { DAY_COLUMNS, DAY_NAMES_DE, getCurrentWeekTuesday } from "./dates";
+import { parseMealItems } from "./meals";
 
 export async function enqueueDailyNotifications(
 	db: Db,
@@ -24,14 +25,15 @@ export async function enqueueDailyNotifications(
 	}
 
 	const dayColumn = DAY_COLUMNS[todayDow as keyof typeof DAY_COLUMNS];
-	const meal = menu[0][dayColumn];
-	if (!meal) {
+	const items = parseMealItems(menu[0][dayColumn]);
+	if (items.length === 0) {
 		console.log(`No meal for ${dayColumn}`);
 		return;
 	}
 
 	const dayName = DAY_NAMES_DE[todayDow];
-	const text = `Guten Appetit! Heute bei Völp:\n\n<b>${dayName}:</b> ${meal}`;
+	const itemList = items.map((i) => `• ${i}`).join("\n");
+	const text = `Guten Appetit! Heute bei Völp:\n\n<b>${dayName}</b>\n${itemList}`;
 
 	const allActive = await db
 		.select()

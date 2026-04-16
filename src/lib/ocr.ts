@@ -15,10 +15,24 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
 }
 
 const PROMPT = `This is a weekly lunch menu ("Mittagstisch") from a German butcher shop, covering Tuesday through Friday.
-Extract the meal for each day. Return ONLY valid JSON, no markdown fences, no explanation:
-{"tuesday":"meal description","wednesday":"meal description","thursday":"meal description","friday":"meal description"}
-Keep the original German text. Include the full meal description as written on the image.
+Extract ALL meals/items for each day. A day may have multiple items.
+Return ONLY valid JSON, no markdown fences, no explanation:
+{"tuesday":["item 1","item 2"],"wednesday":["item"],"thursday":["item"],"friday":["item 1","item 2"]}
+Keep the original German text. Include prices if shown.
 If a day is missing or unreadable, use null for that day.`;
+
+interface RawMenuData {
+	tuesday: string[] | string | null;
+	wednesday: string[] | string | null;
+	thursday: string[] | string | null;
+	friday: string[] | string | null;
+}
+
+function normalizeDay(value: string[] | string | null): string | null {
+	if (value === null) return null;
+	const items = Array.isArray(value) ? value : [value];
+	return JSON.stringify(items);
+}
 
 export async function extractMenuFromImage(
 	ai: Ai,
@@ -55,6 +69,12 @@ export async function extractMenuFromImage(
 		throw new Error(`Could not parse JSON from AI response: ${raw}`);
 	}
 
-	const meals = JSON.parse(jsonMatch[0]) as MenuData;
+	const parsed = JSON.parse(jsonMatch[0]) as RawMenuData;
+	const meals: MenuData = {
+		tuesday: normalizeDay(parsed.tuesday),
+		wednesday: normalizeDay(parsed.wednesday),
+		thursday: normalizeDay(parsed.thursday),
+		friday: normalizeDay(parsed.friday),
+	};
 	return { meals, raw };
 }

@@ -7,6 +7,7 @@ import {
 	getCalendarWeek,
 	getCurrentWeekTuesday,
 } from "./dates";
+import { parseMealItems } from "./meals";
 
 function escapeHtml(s: string): string {
 	return s
@@ -36,6 +37,13 @@ export async function renderSite(
 	const menu = currentMenu[0] ?? null;
 	const kw = getCalendarWeek(weekTuesday);
 
+	function renderMealCell(value: string | null): string {
+		const items = parseMealItems(value);
+		if (items.length === 0) return "";
+		if (items.length === 1) return escapeHtml(items[0]);
+		return `<ul>${items.map((i) => `<li>${escapeHtml(i)}</li>`).join("")}</ul>`;
+	}
+
 	const mealRowsDe = menu
 		? ([2, 3, 4, 5] as const)
 				.map((d) => {
@@ -45,9 +53,9 @@ export async function renderSite(
 						4: "thursday",
 						5: "friday",
 					} as const;
-					const meal = menu[col[d]];
-					if (!meal) return "";
-					return `<tr><td>${DAY_NAMES_DE[d]}</td><td>${escapeHtml(meal)}</td></tr>`;
+					const cell = renderMealCell(menu[col[d]]);
+					if (!cell) return "";
+					return `<tr><td>${DAY_NAMES_DE[d]}</td><td>${cell}</td></tr>`;
 				})
 				.join("\n")
 		: "";
@@ -61,9 +69,9 @@ export async function renderSite(
 						4: "thursday",
 						5: "friday",
 					} as const;
-					const meal = menu[col[d]];
-					if (!meal) return "";
-					return `<tr><td>${DAY_NAMES_EN[d]}</td><td>${escapeHtml(meal)}</td></tr>`;
+					const cell = renderMealCell(menu[col[d]]);
+					if (!cell) return "";
+					return `<tr><td>${DAY_NAMES_EN[d]}</td><td>${cell}</td></tr>`;
 				})
 				.join("\n")
 		: "";
@@ -71,11 +79,11 @@ export async function renderSite(
 	const historyRows = recentMenus
 		.map((m) => {
 			const kw = getCalendarWeek(m.weekStart);
-			const meals = [m.tuesday, m.wednesday, m.thursday, m.friday]
-				.filter((s): s is string => Boolean(s))
+			const allItems = [m.tuesday, m.wednesday, m.thursday, m.friday]
+				.flatMap((v) => parseMealItems(v))
 				.map(escapeHtml)
 				.join(" · ");
-			return `<tr><td>KW ${kw} (${m.weekStart})</td><td>${meals || "—"}</td></tr>`;
+			return `<tr><td>KW ${kw} (${m.weekStart})</td><td>${allItems || "—"}</td></tr>`;
 		})
 		.join("\n");
 
@@ -126,7 +134,9 @@ export async function renderSite(
 		section { background: var(--card-bg); border-radius: 8px; padding: 1.25rem; margin-bottom: 1rem; box-shadow: 0 1px 3px var(--card-shadow); }
 		table { width: 100%; border-collapse: collapse; }
 		td { padding: 0.5rem 0; border-bottom: 1px solid var(--border); }
-		td:first-child { font-weight: 600; white-space: nowrap; width: 120px; }
+		td:first-child { font-weight: 600; white-space: nowrap; width: 120px; vertical-align: top; }
+		td ul { margin: 0; padding-left: 1.2em; }
+		td li { margin-bottom: 0.25rem; }
 		.subscribe-link { display: inline-block; background: var(--link-bg); color: #fff; text-decoration: none; padding: 0.75rem 1.5rem; border-radius: 6px; font-weight: 600; margin-top: 0.5rem; }
 		.subscribe-link:hover { background: var(--link-bg-hover); }
 		.empty { color: var(--text-muted); font-style: italic; }

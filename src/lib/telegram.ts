@@ -8,6 +8,7 @@ import {
 	getCurrentWeekTuesday,
 	parseWeekdays,
 } from "./dates";
+import { parseMealItems } from "./meals";
 
 interface TelegramUpdate {
 	message?: {
@@ -151,22 +152,24 @@ export async function handleTelegramWebhook(
 		const m = menu[0];
 		const kw = getCalendarWeek(weekTuesday);
 		const dn = de ? DAY_NAMES_DE : DAY_NAMES_EN;
-		const rows = [
-			m.tuesday ? [dn[2], m.tuesday] : null,
-			m.wednesday ? [dn[3], m.wednesday] : null,
-			m.thursday ? [dn[4], m.thursday] : null,
-			m.friday ? [dn[5], m.friday] : null,
-		].filter((r): r is [string, string] => r !== null);
+		const days = [
+			[dn[2], parseMealItems(m.tuesday)] as const,
+			[dn[3], parseMealItems(m.wednesday)] as const,
+			[dn[4], parseMealItems(m.thursday)] as const,
+			[dn[5], parseMealItems(m.friday)] as const,
+		].filter(([, items]) => items.length > 0);
 
-		const maxDay = Math.max(...rows.map(([d]) => d.length));
 		const header = de
 			? `<b>Mittagstisch KW ${kw}</b>`
 			: `<b>Lunch Menu CW ${kw}</b>`;
-		const table = rows
-			.map(([day, meal]) => `${day.padEnd(maxDay)}  ${meal}`)
-			.join("\n");
+		const body = days
+			.map(([day, items]) => {
+				const itemList = items.map((i) => `  • ${i}`).join("\n");
+				return `<b>${day}</b>\n${itemList}`;
+			})
+			.join("\n\n");
 
-		await reply(`${header}\n\n<pre>${table}</pre>`);
+		await reply(`${header}\n\n${body}`);
 		return;
 	}
 
