@@ -2,20 +2,23 @@
 
 A Cloudflare Workers service that scrapes the weekly lunch menu ("Mittagstisch") from [Metzgerei Völp](https://metzgerei-voelp.de/aktuelles/) and delivers daily Telegram notifications to subscribers.
 
+**Live:** [voelp.jonas-strassel.de](https://voelp.jonas-strassel.de) | **Bot:** [@voelp_bot](https://t.me/voelp_bot)
+
 ## Features
 
 - **Automatic menu detection** — daily cron scrapes the website for new menu images
-- **AI-powered OCR** — extracts meals per day from the menu image using Cloudflare Workers AI (Gemma 4)
-- **Telegram bot** — subscribe, set preferred days, view the current menu
-- **Static website** — bilingual (DE/EN) page showing the current menu and a subscribe link
-- **Historical data** — all menus are stored permanently for future statistics
+- **AI-powered OCR** — extracts meals per day from the menu image using Cloudflare Workers AI (Mistral Small 3.1)
+- **Multiple items per day** — correctly handles days with more than one meal option
+- **Telegram bot** — subscribe, set preferred days, view the current menu (bilingual DE/EN)
+- **Static website** — bilingual page with dark/light mode, current menu, and subscribe link
+- **Historical data** — all menus stored permanently for future statistics
 
 ## Architecture
 
 - **Cloudflare Workers** — single worker handling webhooks, cron, and queue processing
-- **D1** — SQLite database for menus and subscribers
+- **D1** — SQLite database for menus and subscribers (Drizzle ORM)
 - **Cloudflare Queue** — notification fan-out with automatic retries
-- **Workers AI** — `@cf/google/gemma-4-26b-a4b-it` for image-to-text extraction
+- **Workers AI** — `@cf/mistralai/mistral-small-3.1-24b-instruct` for vision/OCR
 
 ## Telegram Commands
 
@@ -38,7 +41,6 @@ A Cloudflare Workers service that scrapes the weekly lunch menu ("Mittagstisch")
 ### Local Development
 
 ```bash
-# Install dependencies
 npm install
 
 # Set up local environment
@@ -67,14 +69,32 @@ wrangler secret put TELEGRAM_BOT_TOKEN
 # Apply migrations and deploy
 npm run deploy
 
-# Register the Telegram webhook
-curl "https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://voelpping.<subdomain>.workers.dev/webhook/<TOKEN>"
+# Register Telegram webhook and commands
+curl "https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://<DOMAIN>/webhook/<TOKEN>"
+curl "https://api.telegram.org/bot<TOKEN>/setMyCommands" \
+  -H "content-type: application/json" \
+  -d '{"commands":[
+    {"command":"menu","description":"Aktuelle Wochenkarte / Current weekly menu"},
+    {"command":"subscribe","description":"Benachrichtigungen aktivieren / Subscribe"},
+    {"command":"unsubscribe","description":"Abmelden / Unsubscribe"},
+    {"command":"setday","description":"Tage wählen / Set notification days"}
+  ]}'
+```
+
+### Manual Trigger
+
+```bash
+# Scrape and notify
+curl "https://<DOMAIN>/trigger/<TOKEN>"
+
+# Force re-extraction (deletes current week's data first)
+curl "https://<DOMAIN>/trigger/<TOKEN>?force"
 ```
 
 ## Cron Schedule
 
 A single cron runs daily at 09:00 CEST (`0 7 * * *` UTC):
 
-1. Checks the website for a new menu image
-2. If found, runs OCR and stores the extracted meals
+1. Checks the website for a new menu image (compares URL against stored value)
+2. If new, runs OCR and stores the extracted meals as JSON arrays
 3. On Tue–Fri, enqueues notifications to subscribers via the queue
