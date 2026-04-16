@@ -163,10 +163,10 @@ export async function handleTelegramWebhook(
 			? `<b>Mittagstisch KW ${kw}</b>`
 			: `<b>Lunch Menu CW ${kw}</b>`;
 		const table = rows
-			.map(([day, meal]) => `<code>${day.padEnd(maxDay)}</code>  ${meal}`)
+			.map(([day, meal]) => `${day.padEnd(maxDay)}  ${meal}`)
 			.join("\n");
 
-		await reply(`${header}\n\n${table}`);
+		await reply(`${header}\n\n<pre>${table}</pre>`);
 		return;
 	}
 
