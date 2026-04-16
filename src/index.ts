@@ -102,6 +102,16 @@ export default {
 			}
 		}
 
+		if (url.pathname === "/icon.svg") {
+			const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🍖</text></svg>`;
+			return new Response(svg, {
+				headers: {
+					"content-type": "image/svg+xml",
+					"cache-control": "public, max-age=31536000, immutable",
+				},
+			});
+		}
+
 		if (url.pathname === "/" || url.pathname === "") {
 			const db = createDb(env.DB);
 			return renderSite(db, env.BOT_USERNAME);
