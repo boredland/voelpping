@@ -96,31 +96,3 @@ export const DAY_NAMES_EN: Record<number, string> = {
 	4: "Thursday",
 	5: "Friday",
 };
-
-const DAY_ABBREV_MAP: Record<string, number> = {
-	di: 2,
-	mi: 3,
-	do: 4,
-	fr: 5,
-	tue: 2,
-	wed: 3,
-	thu: 4,
-	fri: 5,
-};
-
-export function parseWeekdays(input: string): string | null {
-	const parts = input
-		.split(/[,\s]+/)
-		.map((s) => s.trim().toLowerCase())
-		.filter(Boolean);
-
-	const days: number[] = [];
-	for (const part of parts) {
-		const num = DAY_ABBREV_MAP[part];
-		if (num === undefined) return null;
-		if (!days.includes(num)) days.push(num);
-	}
-	if (days.length === 0) return null;
-	days.sort();
-	return days.join(",");
-}

@@ -2,7 +2,12 @@ import { eq } from "drizzle-orm";
 import type { Db } from "../db/client";
 import { menus, subscribers } from "../db/schema";
 import type { Env, NotificationMessage } from "../env";
-import { DAY_COLUMNS, DAY_NAMES_DE, getCurrentWeekTuesday } from "./dates";
+import {
+	DAY_COLUMNS,
+	DAY_NAMES_DE,
+	DAY_NAMES_EN,
+	getCurrentWeekTuesday,
+} from "./dates";
 import { parseMealItems } from "./meals";
 
 export async function enqueueDailyNotifications(
@@ -31,37 +36,29 @@ export async function enqueueDailyNotifications(
 		return;
 	}
 
-	const dayName = DAY_NAMES_DE[todayDow];
 	const itemList = items.map((i) => `• ${i}`).join("\n");
-	const text = `Guten Appetit! Heute bei Völp:\n\n<b>${dayName}</b>\n${itemList}`;
+	const textDe = `Guten Appetit! Heute bei Völp:\n\n<b>${DAY_NAMES_DE[todayDow]}</b>\n${itemList}`;
+	const textEn = `Enjoy your meal! Today at Völp:\n\n<b>${DAY_NAMES_EN[todayDow]}</b>\n${itemList}`;
 
 	const allActive = await db
 		.select()
 		.from(subscribers)
 		.where(eq(subscribers.active, 1));
 
-	const eligible = allActive.filter((sub) => {
-		if (!sub.weekdays) return true;
-		return sub.weekdays.split(",").map(Number).includes(todayDow);
-	});
-
-	if (eligible.length === 0) {
-		console.log("No eligible subscribers");
+	if (allActive.length === 0) {
+		console.log("No active subscribers");
 		return;
 	}
 
-	const messages: NotificationMessage[] = eligible.map((sub) => ({
+	const messages: NotificationMessage[] = allActive.map((sub) => ({
 		chatId: sub.chatId,
-		text,
+		text: sub.language === "en" ? textEn : textDe,
 	}));
 
-	const batches: NotificationMessage[][] = [];
 	for (let i = 0; i < messages.length; i += 10) {
-		batches.push(messages.slice(i, i + 10));
-	}
-
-	for (const batch of batches) {
-		await env.NOTIFICATION_QUEUE.sendBatch(batch.map((msg) => ({ body: msg })));
+		await env.NOTIFICATION_QUEUE.sendBatch(
+			messages.slice(i, i + 10).map((msg) => ({ body: msg })),
+		);
 	}
 
 	console.log(`Enqueued ${messages.length} notifications`);

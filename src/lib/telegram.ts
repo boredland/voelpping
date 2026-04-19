@@ -8,7 +8,6 @@ import {
 	getBerlinDayOfWeek,
 	getCalendarWeek,
 	getCurrentWeekTuesday,
-	parseWeekdays,
 } from "./dates";
 import { parseMealItems } from "./meals";
 
@@ -42,9 +41,25 @@ async function sendMessage(
 
 export { sendMessage };
 
-function isGerman(update: TelegramUpdate): boolean {
-	const lang = update.message?.from?.language_code ?? "";
-	return lang.startsWith("de");
+function detectLangFromCode(code: string | undefined): "de" | "en" {
+	return code?.toLowerCase().startsWith("de") ? "de" : "en";
+}
+
+// Resolve the language for this interaction, preferring the subscriber's
+// stored preference, falling back to the Telegram message's language_code.
+async function resolveLang(
+	db: Db,
+	chatId: string,
+	update: TelegramUpdate,
+): Promise<"de" | "en"> {
+	const rows = await db
+		.select({ language: subscribers.language })
+		.from(subscribers)
+		.where(eq(subscribers.chatId, chatId))
+		.limit(1);
+	const stored = rows[0]?.language;
+	if (stored === "de" || stored === "en") return stored;
+	return detectLangFromCode(update.message?.from?.language_code);
 }
 
 export async function handleTelegramWebhook(
@@ -57,26 +72,32 @@ export async function handleTelegramWebhook(
 
 	const chatId = String(msg.chat.id);
 	const text = msg.text.trim();
-	const de = isGerman(body);
+	const lang = await resolveLang(db, chatId, body);
+	const de = lang === "de";
 	const reply = (t: string) => sendMessage(token, chatId, t);
 
 	if (text === "/start" || text === "/subscribe") {
+		const detected = detectLangFromCode(msg.from?.language_code);
 		await db
 			.insert(subscribers)
-			.values({ chatId, active: 1 })
-			.onConflictDoUpdate({ target: subscribers.chatId, set: { active: 1 } });
+			.values({ chatId, active: 1, language: detected })
+			.onConflictDoUpdate({
+				target: subscribers.chatId,
+				set: { active: 1 },
+			});
 
+		const welcomeDe = detected === "de";
 		await reply(
-			de
+			welcomeDe
 				? "Willkommen beim Mittagstisch-Bot der Metzgerei Völp! 🥩\n\n" +
 						"Du bekommst jetzt jeden Morgen (Di-Fr) eine Nachricht mit dem Tagesgericht.\n\n" +
 						"/menu — Aktuelle Wochenkarte\n" +
-						"/setday Di,Do — Nur bestimmte Tage\n" +
+						"/lang — Sprache wechseln (DE/EN)\n" +
 						"/unsubscribe — Abmelden"
 				: "Welcome to the Metzgerei Völp lunch menu bot! 🥩\n\n" +
 						"You'll receive a daily notification (Tue-Fri) with the day's meal.\n\n" +
 						"/menu — Current weekly menu\n" +
-						"/setday Tue,Thu — Specific days only\n" +
+						"/lang — Switch language (DE/EN)\n" +
 						"/unsubscribe — Unsubscribe",
 		);
 		return;
@@ -95,42 +116,35 @@ export async function handleTelegramWebhook(
 		return;
 	}
 
-	if (text.startsWith("/setday")) {
-		const arg = text.slice("/setday".length).trim().toLowerCase();
-		if (arg === "alle" || arg === "all" || arg === "") {
-			await db
-				.update(subscribers)
-				.set({ weekdays: null })
-				.where(eq(subscribers.chatId, chatId));
-			await reply(
-				de
-					? "Du wirst an allen Tagen (Di-Fr) benachrichtigt."
-					: "You'll be notified on all days (Tue-Fri).",
-			);
+	if (text.startsWith("/lang")) {
+		const arg = text.slice("/lang".length).trim().toLowerCase();
+		let next: "de" | "en";
+		if (arg === "de" || arg === "deutsch" || arg === "german") {
+			next = "de";
+		} else if (arg === "en" || arg === "english" || arg === "englisch") {
+			next = "en";
+		} else if (arg === "") {
+			next = lang === "de" ? "en" : "de";
 		} else {
-			const parsed = parseWeekdays(arg);
-			if (!parsed) {
-				await reply(
-					de
-						? "Ungültige Tage. Verwende: Di, Mi, Do, Fr (oder Tue, Wed, Thu, Fri)"
-						: "Invalid days. Use: Di, Mi, Do, Fr (or Tue, Wed, Thu, Fri)",
-				);
-				return;
-			}
-			const dayNames = parsed
-				.split(",")
-				.map((d) => (de ? DAY_NAMES_DE : DAY_NAMES_EN)[Number(d)])
-				.join(", ");
-			await db
-				.update(subscribers)
-				.set({ weekdays: parsed })
-				.where(eq(subscribers.chatId, chatId));
 			await reply(
 				de
-					? `Benachrichtigungen auf ${dayNames} gesetzt.`
-					: `Notifications set to ${dayNames}.`,
+					? "Ungültige Sprache. Verwende: /lang de, /lang en, oder /lang zum Umschalten."
+					: "Invalid language. Use: /lang de, /lang en, or /lang to toggle.",
 			);
+			return;
 		}
+		await db
+			.insert(subscribers)
+			.values({ chatId, active: 1, language: next })
+			.onConflictDoUpdate({
+				target: subscribers.chatId,
+				set: { language: next },
+			});
+		await reply(
+			next === "de"
+				? "Sprache auf Deutsch gesetzt."
+				: "Language set to English.",
+		);
 		return;
 	}
 
@@ -155,8 +169,6 @@ export async function handleTelegramWebhook(
 		const kw = getCalendarWeek(weekTuesday);
 		const dn = de ? DAY_NAMES_DE : DAY_NAMES_EN;
 		const todayDow = getBerlinDayOfWeek();
-		// Only include today and future days of the menu week.
-		// On Sat/Sun/Mon, the whole upcoming Tue-Fri is "future".
 		const minDow = todayDow >= 2 && todayDow <= 5 ? todayDow : 2;
 		const days = (
 			[

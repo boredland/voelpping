@@ -15,7 +15,7 @@ export const menus = sqliteTable("menus", {
 export const subscribers = sqliteTable("subscribers", {
 	id: integer().primaryKey({ autoIncrement: true }),
 	chatId: text("chat_id").notNull().unique(),
-	weekdays: text(),
+	language: text(),
 	active: integer().notNull().default(1),
 	createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
 });
