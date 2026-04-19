@@ -1,35 +1,42 @@
-const FACEBOOK_FEED_URL = "https://rss.app/feeds/v1.1/mcTHhkbKVvbB47IT.json";
+const FACEBOOK_FEED_URL =
+	"https://fetchrss.com/feed/1wESJPEKh0Cg1wESFN1eN34k.rss";
 
-interface FeedItem {
-	id: string;
-	url: string;
-	title: string;
-	content_text?: string;
-	image?: string;
-	date_published: string;
-}
-
-interface JsonFeed {
-	items: FeedItem[];
-}
-
-// Returns the most recent image URLs from the Facebook feed, newest first.
-// We return multiple candidates so callers can OCR them in order and pick
-// the first that actually looks like a menu (the FB page also posts other
-// graphics which we need to skip past).
-export async function findMenuImageCandidates(limit = 5): Promise<string[]> {
+// Returns image URLs from the most recent feed items, newest first.
+// FetchRSS embeds *all* photos from a carousel post inside <description>
+// as <img src="..."> tags, so we extract every src to get all candidates.
+// rss.app's JSON feed only returned the first photo per post.
+export async function findMenuImageCandidates(
+	itemLimit = 5,
+	imagesPerItem = 10,
+): Promise<string[]> {
 	const res = await fetch(FACEBOOK_FEED_URL);
 	if (!res.ok) {
 		console.error(`Failed to fetch feed: ${res.status}`);
 		return [];
 	}
 
-	const feed = (await res.json()) as JsonFeed;
-	const images = feed.items
-		.filter((item): item is FeedItem & { image: string } => Boolean(item.image))
-		.slice(0, limit)
-		.map((item) => item.image);
+	const xml = await res.text();
+	const items = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)]
+		.slice(0, itemLimit)
+		.map((m) => m[1]);
 
-	console.log(`Found ${images.length} candidate image(s) in feed`);
-	return images;
+	const urls: string[] = [];
+	for (const item of items) {
+		const descMatch = item.match(/<description>([\s\S]*?)<\/description>/);
+		const desc = descMatch?.[1] ?? "";
+		// Description is wrapped in CDATA or HTML-escaped — extract src attrs from
+		// either form. Decode &amp; back to & for valid Facebook CDN URLs.
+		const imgs = [...desc.matchAll(/<img[^>]*src="([^"]+)"/g)].map((m) =>
+			m[1].replace(/&amp;/g, "&"),
+		);
+		for (const u of imgs) {
+			if (urls.length >= itemLimit * imagesPerItem) break;
+			if (!urls.includes(u)) urls.push(u);
+		}
+	}
+
+	console.log(
+		`Found ${urls.length} candidate image(s) across ${items.length} item(s)`,
+	);
+	return urls;
 }
