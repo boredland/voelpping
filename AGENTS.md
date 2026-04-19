@@ -40,7 +40,11 @@ The Mistral Small 3.1 vision call takes ~30-60 seconds for a ~900KB PNG. This is
 
 ## Scraper
 
-The menu image URL is extracted from the HTML of `https://metzgerei-voelp.de/aktuelles/` using a regex match on `href` attributes containing "mittagstisch". This is intentionally loose — we don't rely on the filename date pattern (e.g., `mittagstisch-metzgerei-voelp-14042026.png`) because it could change. Instead, we compare the full URL against what's stored in D1 to detect new images.
+The menu image comes from the shop's Facebook page (`facebook.com/MetzgereiVoelp`) via an [RSS.app](https://rss.app) JSON feed. We tried their WordPress page first (`/aktuelles/`) but the image there is often outdated; the Facebook feed is kept more current.
+
+Facebook itself cannot be scraped directly — it blocks unauthenticated access and uses obfuscated markup. RSS.app handles that and exposes a stable JSON feed. We pick the most recent item with an image and empty `content_text` (menu posts have no caption; text posts are news/announcements).
+
+If the Facebook feed approach breaks, the WordPress fallback logic could be restored from git history.
 
 ## Menu Data Storage
 

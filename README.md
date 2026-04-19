@@ -1,6 +1,6 @@
 # Voelpping
 
-A Cloudflare Workers service that scrapes the weekly lunch menu ("Mittagstisch") from [Metzgerei Völp](https://metzgerei-voelp.de/aktuelles/) and delivers daily Telegram notifications to subscribers.
+A Cloudflare Workers service that picks up the weekly lunch menu ("Mittagstisch") image from [Metzgerei Völp's Facebook page](https://www.facebook.com/MetzgereiVoelp) (via an RSS.app feed) and delivers daily Telegram notifications to subscribers.
 
 **Live:** [voelp.jonas-strassel.de](https://voelp.jonas-strassel.de) | **Bot:** [@voelp_bot](https://t.me/voelp_bot)
 

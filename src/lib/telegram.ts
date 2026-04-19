@@ -4,6 +4,7 @@ import { menus, subscribers } from "../db/schema";
 import {
 	DAY_NAMES_DE,
 	DAY_NAMES_EN,
+	getBerlinDayOfWeek,
 	getCalendarWeek,
 	getCurrentWeekTuesday,
 	parseWeekdays,
@@ -152,18 +153,33 @@ export async function handleTelegramWebhook(
 		const m = menu[0];
 		const kw = getCalendarWeek(weekTuesday);
 		const dn = de ? DAY_NAMES_DE : DAY_NAMES_EN;
-		const days = [
-			[dn[2], parseMealItems(m.tuesday)] as const,
-			[dn[3], parseMealItems(m.wednesday)] as const,
-			[dn[4], parseMealItems(m.thursday)] as const,
-			[dn[5], parseMealItems(m.friday)] as const,
-		].filter(([, items]) => items.length > 0);
+		const todayDow = getBerlinDayOfWeek();
+		// Only include today and future days of the menu week.
+		// On Sat/Sun/Mon, the whole upcoming Tue-Fri is "future".
+		const minDow = todayDow >= 2 && todayDow <= 5 ? todayDow : 2;
+		const days = (
+			[
+				[2, dn[2], parseMealItems(m.tuesday)],
+				[3, dn[3], parseMealItems(m.wednesday)],
+				[4, dn[4], parseMealItems(m.thursday)],
+				[5, dn[5], parseMealItems(m.friday)],
+			] as const
+		).filter(([dow, , items]) => dow >= minDow && items.length > 0);
+
+		if (days.length === 0) {
+			await reply(
+				de
+					? "Für heute/diese Woche gibt es keinen Mittagstisch mehr."
+					: "No more lunch menu for today/this week.",
+			);
+			return;
+		}
 
 		const header = de
 			? `<b>Mittagstisch KW ${kw}</b>`
 			: `<b>Lunch Menu CW ${kw}</b>`;
 		const body = days
-			.map(([day, items]) => {
+			.map(([, day, items]) => {
 				const itemList = items.map((i) => `  • ${i}`).join("\n");
 				return `<b>${day}</b>\n${itemList}`;
 			})

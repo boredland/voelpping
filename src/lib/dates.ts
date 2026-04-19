@@ -28,15 +28,17 @@ export function getBerlinDayOfWeek(): number {
 	return map[day] ?? 0;
 }
 
+// Returns the Tuesday of the current/upcoming menu week.
+// On Tue-Fri: the Tuesday of the current week.
+// On Sat/Sun/Mon: the Tuesday of the *upcoming* week (menus are posted in advance).
 export function getCurrentWeekTuesday(): string {
 	const now = new Date(
 		new Date().toLocaleString("en-US", { timeZone: BERLIN_TZ }),
 	);
 	const dow = now.getDay();
-	// Days back to reach Tuesday: Mon→6, Sun→5, Sat→4, Fri→3, Thu→2, Wed→1, Tue→0
-	const daysBack = dow === 0 ? 5 : dow === 1 ? 6 : dow === 6 ? 4 : dow - 2;
+	const offset = dow >= 2 && dow <= 5 ? -(dow - 2) : (9 - dow) % 7;
 	const tuesday = new Date(now);
-	tuesday.setDate(tuesday.getDate() - daysBack);
+	tuesday.setDate(tuesday.getDate() + offset);
 	return formatDate(tuesday);
 }
 
