@@ -9,6 +9,44 @@ import { findMenuImageCandidates } from "./lib/scraper";
 import { renderSite } from "./lib/site";
 import { handleTelegramWebhook } from "./lib/telegram";
 
+async function storeMenuForUrl(
+	db: ReturnType<typeof createDb>,
+	env: Env,
+	imageUrl: string,
+	weekTuesday: string,
+): Promise<boolean> {
+	console.log(`Trying image: ${imageUrl}`);
+	const result = await extractMenuFromImage(env.AI, imageUrl);
+	if (!result) return false;
+
+	const { meals, raw } = result;
+	await db
+		.insert(menus)
+		.values({
+			weekStart: weekTuesday,
+			imageUrl,
+			tuesday: meals.tuesday,
+			wednesday: meals.wednesday,
+			thursday: meals.thursday,
+			friday: meals.friday,
+			rawOcr: raw,
+		})
+		.onConflictDoUpdate({
+			target: menus.weekStart,
+			set: {
+				imageUrl,
+				tuesday: meals.tuesday,
+				wednesday: meals.wednesday,
+				thursday: meals.thursday,
+				friday: meals.friday,
+				rawOcr: raw,
+			},
+		});
+
+	console.log(`Menu stored for week ${weekTuesday}`);
+	return true;
+}
+
 async function scrapeAndStore(
 	db: ReturnType<typeof createDb>,
 	env: Env,
@@ -30,47 +68,14 @@ async function scrapeAndStore(
 	}
 
 	for (const imageUrl of candidates) {
-		// Skip candidates we've already seen and rejected (OCR'd but not a menu)
-		// by checking against the stored image_url — we only store menus that
-		// pass OCR, so any stored imageUrl means that candidate IS the current menu.
 		if (existing.length > 0 && existing[0].imageUrl === imageUrl) {
 			console.log(`Skipping candidate ${imageUrl} — already stored`);
 			return;
 		}
 
-		console.log(`Trying candidate: ${imageUrl}`);
-		const result = await extractMenuFromImage(env.AI, imageUrl);
-		if (!result) {
-			console.log("Candidate is not a menu, trying next");
-			continue;
-		}
-
-		const { meals, raw } = result;
-		await db
-			.insert(menus)
-			.values({
-				weekStart: weekTuesday,
-				imageUrl,
-				tuesday: meals.tuesday,
-				wednesday: meals.wednesday,
-				thursday: meals.thursday,
-				friday: meals.friday,
-				rawOcr: raw,
-			})
-			.onConflictDoUpdate({
-				target: menus.weekStart,
-				set: {
-					imageUrl,
-					tuesday: meals.tuesday,
-					wednesday: meals.wednesday,
-					thursday: meals.thursday,
-					friday: meals.friday,
-					rawOcr: raw,
-				},
-			});
-
-		console.log(`Menu stored for week ${weekTuesday}`);
-		return;
+		const stored = await storeMenuForUrl(db, env, imageUrl, weekTuesday);
+		if (stored) return;
+		console.log("Candidate is not a menu, trying next");
 	}
 
 	console.log("No menu found among candidates");
@@ -99,13 +104,26 @@ export default {
 		if (url.pathname === `/trigger/${env.TELEGRAM_BOT_TOKEN}`) {
 			const db = createDb(env.DB);
 			const force = url.searchParams.has("force");
+			const overrideUrl = url.searchParams.get("url");
 			try {
-				if (force) {
+				if (force || overrideUrl) {
 					const weekTuesday = getCurrentWeekTuesday();
 					await db.delete(menus).where(eq(menus.weekStart, weekTuesday));
-					console.log(`Force: deleted menu for ${weekTuesday}`);
+					console.log(`Cleared menu for ${weekTuesday}`);
 				}
-				await scrapeAndStore(db, env);
+
+				if (overrideUrl) {
+					const weekTuesday = getCurrentWeekTuesday();
+					const ok = await storeMenuForUrl(db, env, overrideUrl, weekTuesday);
+					if (!ok) {
+						return new Response("override image was not recognized as a menu", {
+							status: 400,
+						});
+					}
+				} else {
+					await scrapeAndStore(db, env);
+				}
+
 				const todayDow = getBerlinDayOfWeek();
 				if (todayDow >= 2 && todayDow <= 5) {
 					await enqueueDailyNotifications(db, env, todayDow);
