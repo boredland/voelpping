@@ -4,6 +4,7 @@ import { menus, subscribers } from "../db/schema";
 import {
 	DAY_NAMES_DE,
 	DAY_NAMES_EN,
+	formatMenuWeekRange,
 	getBerlinDayOfWeek,
 	getCalendarWeek,
 	getCurrentWeekTuesday,
@@ -175,9 +176,10 @@ export async function handleTelegramWebhook(
 			return;
 		}
 
+		const range = formatMenuWeekRange(weekTuesday);
 		const header = de
-			? `<b>Mittagstisch KW ${kw}</b>`
-			: `<b>Lunch Menu CW ${kw}</b>`;
+			? `<b>Mittagstisch KW ${kw}</b> (${range})`
+			: `<b>Lunch Menu CW ${kw}</b> (${range})`;
 		const body = days
 			.map(([, day, items]) => {
 				const itemList = items.map((i) => `  • ${i}`).join("\n");

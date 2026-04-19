@@ -57,6 +57,25 @@ export function getCalendarWeek(dateStr: string): number {
 	return Math.ceil(dayOfYear / 7);
 }
 
+// Returns the Friday date (3 days after the Tuesday) as "YYYY-MM-DD".
+function addDays(dateStr: string, days: number): string {
+	const d = new Date(dateStr);
+	d.setDate(d.getDate() + days);
+	return formatDate(d);
+}
+
+// Format a "YYYY-MM-DD" date as "DD.MM.".
+function formatShort(dateStr: string): string {
+	const [, m, d] = dateStr.split("-");
+	return `${d}.${m}.`;
+}
+
+// Returns e.g. "21.04. – 24.04." for the Tue-Fri range starting at tuesdayStr.
+export function formatMenuWeekRange(tuesdayStr: string): string {
+	const friday = addDays(tuesdayStr, 3);
+	return `${formatShort(tuesdayStr)} – ${formatShort(friday)}`;
+}
+
 export const DAY_COLUMNS = {
 	2: "tuesday",
 	3: "wednesday",

@@ -4,6 +4,7 @@ import { menus } from "../db/schema";
 import {
 	DAY_NAMES_DE,
 	DAY_NAMES_EN,
+	formatMenuWeekRange,
 	getCalendarWeek,
 	getCurrentWeekTuesday,
 } from "./dates";
@@ -36,6 +37,7 @@ export async function renderSite(
 
 	const menu = currentMenu[0] ?? null;
 	const kw = getCalendarWeek(weekTuesday);
+	const range = formatMenuWeekRange(weekTuesday);
 
 	function renderMealCell(value: string | null): string {
 		const items = parseMealItems(value);
@@ -78,11 +80,12 @@ export async function renderSite(
 	const historyRows = recentMenus
 		.map((m) => {
 			const kw = getCalendarWeek(m.weekStart);
+			const r = formatMenuWeekRange(m.weekStart);
 			const allItems = [m.tuesday, m.wednesday, m.thursday, m.friday]
 				.flatMap((v) => parseMealItems(v))
 				.map(escapeHtml)
 				.join(" · ");
-			return `<tr><td>KW ${kw} (${m.weekStart})</td><td>${allItems || "—"}</td></tr>`;
+			return `<tr><td>KW ${kw}<br><small>${r}</small></td><td>${allItems || "—"}</td></tr>`;
 		})
 		.join("\n");
 
@@ -156,8 +159,8 @@ export async function renderSite(
 
 	<h1 lang="de">🥩 Mittagstisch</h1>
 	<h1 lang="en">🥩 Lunch Menu</h1>
-	<p class="subtitle" lang="de">Metzgerei Völp – KW ${kw}</p>
-	<p class="subtitle" lang="en">Metzgerei Völp – CW ${kw}</p>
+	<p class="subtitle" lang="de">Metzgerei Völp – KW ${kw} (${range})</p>
+	<p class="subtitle" lang="en">Metzgerei Völp – CW ${kw} (${range})</p>
 
 	<section>
 		${
@@ -190,7 +193,7 @@ export async function renderSite(
 	<footer>
 		<span lang="de">Daten von</span>
 		<span lang="en">Data from</span>
-		<a href="https://metzgerei-voelp.de/aktuelles/">metzgerei-voelp.de</a>
+		<a href="https://metzgerei-voelp.de/aktuelles/" target="_blank" rel="noopener">metzgerei-voelp.de</a>
 	</footer>
 
 	<script>
