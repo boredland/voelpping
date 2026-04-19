@@ -5,7 +5,7 @@ import type { Env, NotificationMessage } from "./env";
 import { getBerlinDayOfWeek, getCurrentWeekTuesday } from "./lib/dates";
 import { enqueueDailyNotifications } from "./lib/notify";
 import { extractMenuFromImage } from "./lib/ocr";
-import { findMenuImageUrl } from "./lib/scraper";
+import { findMenuImageCandidates } from "./lib/scraper";
 import { renderSite } from "./lib/site";
 import { handleTelegramWebhook } from "./lib/telegram";
 
@@ -13,8 +13,8 @@ async function scrapeAndStore(
 	db: ReturnType<typeof createDb>,
 	env: Env,
 ): Promise<void> {
-	const imageUrl = await findMenuImageUrl();
-	if (!imageUrl) return;
+	const candidates = await findMenuImageCandidates();
+	if (candidates.length === 0) return;
 
 	const weekTuesday = getCurrentWeekTuesday();
 	const existing = await db
@@ -23,42 +23,57 @@ async function scrapeAndStore(
 		.where(eq(menus.weekStart, weekTuesday))
 		.limit(1);
 
-	if (existing.length > 0 && existing[0].imageUrl === imageUrl) {
+	// Short-circuit if the newest candidate matches what we already stored.
+	if (existing.length > 0 && existing[0].imageUrl === candidates[0]) {
 		console.log("Menu already stored for this week");
 		return;
 	}
 
-	if (existing.length > 0 && existing[0].imageUrl !== imageUrl) {
-		console.log("New image detected for current week, updating");
-	}
+	for (const imageUrl of candidates) {
+		// Skip candidates we've already seen and rejected (OCR'd but not a menu)
+		// by checking against the stored image_url — we only store menus that
+		// pass OCR, so any stored imageUrl means that candidate IS the current menu.
+		if (existing.length > 0 && existing[0].imageUrl === imageUrl) {
+			console.log(`Skipping candidate ${imageUrl} — already stored`);
+			return;
+		}
 
-	console.log(`Extracting menu from: ${imageUrl}`);
-	const { meals, raw } = await extractMenuFromImage(env.AI, imageUrl);
+		console.log(`Trying candidate: ${imageUrl}`);
+		const result = await extractMenuFromImage(env.AI, imageUrl);
+		if (!result) {
+			console.log("Candidate is not a menu, trying next");
+			continue;
+		}
 
-	await db
-		.insert(menus)
-		.values({
-			weekStart: weekTuesday,
-			imageUrl,
-			tuesday: meals.tuesday,
-			wednesday: meals.wednesday,
-			thursday: meals.thursday,
-			friday: meals.friday,
-			rawOcr: raw,
-		})
-		.onConflictDoUpdate({
-			target: menus.weekStart,
-			set: {
+		const { meals, raw } = result;
+		await db
+			.insert(menus)
+			.values({
+				weekStart: weekTuesday,
 				imageUrl,
 				tuesday: meals.tuesday,
 				wednesday: meals.wednesday,
 				thursday: meals.thursday,
 				friday: meals.friday,
 				rawOcr: raw,
-			},
-		});
+			})
+			.onConflictDoUpdate({
+				target: menus.weekStart,
+				set: {
+					imageUrl,
+					tuesday: meals.tuesday,
+					wednesday: meals.wednesday,
+					thursday: meals.thursday,
+					friday: meals.friday,
+					rawOcr: raw,
+				},
+			});
 
-	console.log(`Menu stored for week ${weekTuesday}`);
+		console.log(`Menu stored for week ${weekTuesday}`);
+		return;
+	}
+
+	console.log("No menu found among candidates");
 }
 
 export default {

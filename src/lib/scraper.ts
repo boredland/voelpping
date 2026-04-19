@@ -13,26 +13,23 @@ interface JsonFeed {
 	items: FeedItem[];
 }
 
-export async function findMenuImageUrl(): Promise<string | null> {
+// Returns the most recent image URLs from the Facebook feed, newest first.
+// We return multiple candidates so callers can OCR them in order and pick
+// the first that actually looks like a menu (the FB page also posts other
+// graphics which we need to skip past).
+export async function findMenuImageCandidates(limit = 5): Promise<string[]> {
 	const res = await fetch(FACEBOOK_FEED_URL);
 	if (!res.ok) {
 		console.error(`Failed to fetch feed: ${res.status}`);
-		return null;
+		return [];
 	}
 
 	const feed = (await res.json()) as JsonFeed;
+	const images = feed.items
+		.filter((item): item is FeedItem & { image: string } => Boolean(item.image))
+		.slice(0, limit)
+		.map((item) => item.image);
 
-	// Menu posts have no caption (empty content_text) — text posts are news, not menus.
-	// Pick the most recent such post; items are already ordered newest-first.
-	const menuPost = feed.items.find(
-		(item) => item.image && !item.content_text?.trim(),
-	);
-
-	if (!menuPost) {
-		console.log("No menu-like post found in feed");
-		return null;
-	}
-
-	console.log(`Menu post: ${menuPost.date_published} → ${menuPost.image}`);
-	return menuPost.image ?? null;
+	console.log(`Found ${images.length} candidate image(s) in feed`);
+	return images;
 }
