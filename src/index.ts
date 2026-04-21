@@ -83,12 +83,16 @@ async function enrichMenu(
 	weekTuesday: string,
 	meals: MenuData,
 ): Promise<void> {
-	let mealsEn: MenuData;
+	let mealsEn: MenuData = {
+		tuesday: null,
+		wednesday: null,
+		thursday: null,
+		friday: null,
+	};
 	try {
 		mealsEn = await translateMeals(env.DEEPL_API_KEY, meals);
 	} catch (e) {
-		console.error("Translation failed:", e);
-		return;
+		console.error("Translation failed (continuing with images):", e);
 	}
 
 	const days = [2, 3, 4, 5] as const;
@@ -113,6 +117,7 @@ async function enrichMenu(
 						col,
 						idx,
 						bytes,
+						"image/jpeg",
 					);
 					imagesByDay[dow][idx] = url;
 				} catch (e) {
@@ -228,6 +233,32 @@ export default {
 				return new Response("triggered");
 			} catch (e) {
 				console.error("Manual trigger error:", e);
+				return new Response(`error: ${e}`, { status: 500 });
+			}
+		}
+
+		if (url.pathname === `/test-ai/${env.TELEGRAM_BOT_TOKEN}`) {
+			try {
+				const res = await env.AI.run(
+					"google/nano-banana-pro" as Parameters<typeof env.AI.run>[0],
+					{
+						prompt: "A plate of spaghetti",
+						aspect_ratio: "1:1",
+						output_format: "jpg",
+						image_size: "1K",
+					} as Record<string, unknown>,
+					{ gateway: { id: "default" } },
+				);
+				const t = typeof res;
+				const c = res?.constructor?.name ?? "null";
+				const preview =
+					t === "object"
+						? JSON.stringify(res).slice(0, 500)
+						: String(res).slice(0, 500);
+				return new Response(`type=${t} constructor=${c}\n${preview}`, {
+					status: 200,
+				});
+			} catch (e) {
 				return new Response(`error: ${e}`, { status: 500 });
 			}
 		}
