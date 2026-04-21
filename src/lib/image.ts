@@ -1,4 +1,6 @@
-const MODEL = "google/nano-banana-pro";
+const GATEWAY_BASE =
+	"https://gateway.ai.cloudflare.com/v1/cd1e88db5a44de0f45317275cbcef879/default/google-ai-studio";
+const IMAGEN_MODEL = "imagen-3.0-generate-001";
 
 function base64ToBytes(base64: string): Uint8Array {
 	const binary = atob(base64);
@@ -42,32 +44,12 @@ function buildPrompt(itemDe: string): string {
 	return `Handyfoto von oben: Mittagstisch-Gericht aus einer kleinen deutschen Metzgerei, zum Mitnehmen: ${dish}.${extra} In einer weißen Styropor-Imbissschale auf einer einfachen Holztheke. Nur die genannten Speisen in der Schale — keine Extras, keine Deko, keine Zitrone, keine Petersilie, kein Besteck, kein Deckel. Flaches Neonlicht, Handykamera-Ästhetik.`;
 }
 
-async function readStream(stream: ReadableStream): Promise<Uint8Array> {
-	const reader = stream.getReader();
-	const chunks: Uint8Array[] = [];
-	while (true) {
-		const { done, value } = await reader.read();
-		if (done) break;
-		if (value) chunks.push(value);
-	}
-	const total = chunks.reduce((n, c) => n + c.length, 0);
-	const bytes = new Uint8Array(total);
-	let offset = 0;
-	for (const c of chunks) {
-		bytes.set(c, offset);
-		offset += c.length;
-	}
-	return bytes;
-}
-
-function dataUriToBytes(uri: string): Uint8Array {
-	const match = uri.match(/^data:[^;]+;base64,(.+)$/);
-	if (match) return base64ToBytes(match[1]);
-	throw new Error("Unexpected image URI format");
+interface ImagenResponse {
+	predictions?: { bytesBase64Encoded?: string; mimeType?: string }[];
 }
 
 export async function generateMealImage(
-	ai: Ai,
+	googleApiKey: string,
 	itemDe: string,
 ): Promise<Uint8Array> {
 	if (!itemDe.trim()) {
@@ -76,38 +58,34 @@ export async function generateMealImage(
 
 	const prompt = buildPrompt(itemDe);
 	console.log(
-		`image prompt (${prompt.length} chars) for item "${itemDe.slice(0, 60)}"`,
-	);
-	const response = (await ai.run(
-		MODEL,
-		{
-			prompt,
-			aspect_ratio: "1:1",
-			output_format: "jpg",
-			image_size: "1K",
-		} as Record<string, unknown>,
-		{ gateway: { id: "default" } },
-	)) as { image?: string } | ReadableStream | Uint8Array | ArrayBuffer | string;
-
-	console.log(
-		`${MODEL} response type: ${typeof response}, constructor: ${response?.constructor?.name}`,
+		`imagen prompt (${prompt.length} chars) for item "${itemDe.slice(0, 60)}"`,
 	);
 
-	if (typeof response === "string") return dataUriToBytes(response);
-	if (response instanceof ReadableStream) return readStream(response);
-	if (response instanceof ArrayBuffer) return new Uint8Array(response);
-	if (response instanceof Uint8Array) return response;
-	if (
-		response &&
-		typeof response === "object" &&
-		"image" in response &&
-		typeof response.image === "string"
-	) {
-		if (response.image.startsWith("data:"))
-			return dataUriToBytes(response.image);
-		return base64ToBytes(response.image);
+	const url = `${GATEWAY_BASE}/v1beta/models/${IMAGEN_MODEL}:predict`;
+	const res = await fetch(url, {
+		method: "POST",
+		headers: {
+			"content-type": "application/json",
+			"x-goog-api-key": googleApiKey,
+		},
+		body: JSON.stringify({
+			instances: [{ prompt }],
+			parameters: { sampleCount: 1, aspectRatio: "1:1" },
+		}),
+	});
+
+	if (!res.ok) {
+		const body = await res.text();
+		throw new Error(`Imagen ${res.status}: ${body.slice(0, 300)}`);
 	}
-	throw new Error(
-		`${MODEL} returned unexpected response: ${JSON.stringify(response).slice(0, 200)}`,
-	);
+
+	const data = (await res.json()) as ImagenResponse;
+	const prediction = data.predictions?.[0];
+	if (!prediction?.bytesBase64Encoded) {
+		throw new Error(
+			`Imagen returned no image: ${JSON.stringify(data).slice(0, 300)}`,
+		);
+	}
+
+	return base64ToBytes(prediction.bytesBase64Encoded);
 }

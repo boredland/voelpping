@@ -109,7 +109,7 @@ async function enrichMenu(
 			const itemsDe = parseMealItems(meals[col]);
 			return itemsDe.map(async (item, idx) => {
 				try {
-					const bytes = await generateMealImage(env.AI, item);
+					const bytes = await generateMealImage(env.GOOGLE_AI_API_KEY, item);
 					const url = await uploadMenuImage(
 						env.MENU_IMAGES,
 						env.R2_PUBLIC_BASE_URL,
@@ -239,24 +239,12 @@ export default {
 
 		if (url.pathname === `/test-ai/${env.TELEGRAM_BOT_TOKEN}`) {
 			try {
-				const res = await env.AI.run(
-					"google/nano-banana-pro" as Parameters<typeof env.AI.run>[0],
-					{
-						prompt: "A plate of spaghetti",
-						aspect_ratio: "1:1",
-						output_format: "jpg",
-						image_size: "1K",
-					} as Record<string, unknown>,
-					{ gateway: { id: "default" } },
+				const bytes = await generateMealImage(
+					env.GOOGLE_AI_API_KEY,
+					"Frankfurter Grüne Sauce mit Eiern und Kartoffeln",
 				);
-				const t = typeof res;
-				const c = res?.constructor?.name ?? "null";
-				const preview =
-					t === "object"
-						? JSON.stringify(res).slice(0, 500)
-						: String(res).slice(0, 500);
-				return new Response(`type=${t} constructor=${c}\n${preview}`, {
-					status: 200,
+				return new Response(bytes, {
+					headers: { "content-type": "image/png" },
 				});
 			} catch (e) {
 				return new Response(`error: ${e}`, { status: 500 });
