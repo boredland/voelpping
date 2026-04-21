@@ -26,19 +26,21 @@ const DISH_HINTS: { match: RegExp; visual: string }[] = [
 	{
 		match: /gr[üu]ne sauce|green sauce/i,
 		visual:
-			"The 'green sauce' is Frankfurter Grüne Sauce, a traditional Hessian cold herb sauce: a sour-cream base with coarsely chopped boiled eggs blended in, salt and spices, and a heavy amount of fresh herbs (parsley, chervil, chives, sorrel, cress, borage, salad burnet) pulsed in a blender but NOT to a smooth puree — the finished sauce is chunky and textured, pale mint-to-sage green, with visible small pieces of egg white and bright flecks of chopped herb suspended in creamy sour cream. Served as a pool or small bowl of sauce with halved hard-boiled eggs and halved boiled waxy yellow potatoes arranged next to it on the side — eggs and potatoes are plain and undressed, the sauce stays in its own pool, it is NOT drizzled over the eggs or potatoes.",
+			"'Green sauce' here is Frankfurter Grüne Sauce: cold chunky pale mint-green sour-cream sauce with coarsely-blended boiled-egg pieces and heavy chopped fresh herbs (parsley, chervil, chives, sorrel, cress) — visible texture, NOT smooth, NOT puree. Served as a pool or small bowl BESIDE halved hard-boiled eggs and halved boiled yellow potatoes; eggs and potatoes plain and undressed, sauce stays in its own pool, never drizzled on top.",
 	},
 	{
 		match: /kartoffelsalat|potato salad/i,
 		visual:
-			"The potato salad is German-style: cold, thinly sliced waxy potatoes (thin uniform coin slices about 3mm, NOT cubes) glistening in either a light broth-and-vinegar dressing (southern/Hessian) or a creamy mayonnaise-and-mustard dressing (northern), with finely chopped chives or parsley and small diced pickles visible.",
+			"German potato salad: cold thin 3mm coin-slices of waxy potato (NOT cubes), in a light broth-vinegar or creamy mayo-mustard dressing, chives and small diced pickles visible.",
 	},
 	{
 		match: /fleischwurst|lyoner|meat sausage/i,
 		visual:
-			"'Fleischwurst' is the German equivalent of American bologna: a soft, finely-ground, emulsified pork sausage with a smooth uniform pale-pink-to-beige interior, no visible chunks or grain, shaped as a large cylindrical ring or loaf and served as thick flat slices (about 1cm thick) or a whole peeled ring. NOT a grilled bratwurst, NOT a hot dog, NOT a salami, NOT a crumbly or chunky sausage.",
+			"'Fleischwurst' is the German equivalent of American bologna: soft finely-ground emulsified pork sausage, smooth uniform pale-pink interior (no grain, no visible chunks), shaped as a peeled cylindrical ring or thick flat 1cm slices. NOT bratwurst, NOT salami, NOT a hot dog, NOT grilled.",
 	},
 ];
+
+const PROMPT_LIMIT = 2048;
 
 function buildPrompt(itemEn: string): string {
 	const dish = stripPrices(itemEn);
@@ -46,9 +48,16 @@ function buildPrompt(itemEn: string): string {
 		.map((h) => h.visual)
 		.join(" ");
 	const extra = hints ? ` ${hints}` : "";
-	return `STRICT RULE: render ONLY the food items explicitly listed in the dish description. Do NOT invent, add or imagine any extra sides, garnishes, herbs, sauces, vegetables, lemon wedges, parsley sprigs, bread, butter, salad, pickles, drinks, or any ingredient that is not named below. If the dish says only "porchetta", show only porchetta — nothing next to it, no onions, no rosemary, no potatoes. Empty space in the tray is fine.
+	const prompt = `STRICT: render ONLY the food items explicitly named below — no invented sides, no garnishes, no lemon, no herb sprigs, no onion, no bread, no pickles, no lettuce. Empty tray space is fine.
 
-Quick overhead phone snapshot of a daily lunch special from a small German neighborhood butcher shop (Metzgerei), packed for takeaway: ${dish}.${extra} Served in a plain open white styrofoam takeaway tray (typical German "Imbissschale" — shallow rectangular EPS foam tray with ridged bottom, lid removed and not visible), placed on a plain shop counter or cheap wooden table. Honest portion sizes, home-style plating, nothing fancy. Nothing else in the frame: NO cutlery of any kind (no fork, no spoon, no knife, no chopsticks), NO container lid, NO napkin, NO side containers, NO packaging, NO drinks, NO garnish-placement, NO decorative parsley — only the food listed above, in its one styrofoam tray. Lit by the flat slightly greenish overhead fluorescent of a small shop interior or by a cheap phone flash: harsh direct light, flat shadows, slightly blown highlights on wet surfaces. Shot handheld on a cheap mid-range smartphone: soft focus, faint motion blur, visible sensor noise, compressed JPEG look, everything roughly in focus but nothing crisp, centered subject with no compositional care, slight camera tilt. Amateur snapshot aesthetic. NOT food photography, NOT restaurant plating, NO shallow depth of field, NO color grading, NO styling, NO magazine polish. No text, no logos, no watermarks.`;
+Overhead phone snapshot of a takeaway lunch from a small German neighborhood butcher (Metzgerei): ${dish}.${extra} Served in a plain open white styrofoam Imbissschale (shallow rectangular EPS clamshell base, no lid visible), on a cheap wooden counter. Nothing else in frame: no cutlery (no fork/spoon/knife), no lid, no napkin, no side containers, no drinks, no decorative garnish. Flat greenish shop fluorescent or cheap phone flash — harsh direct light, flat shadows, slight highlight blow. Handheld mid-range smartphone: soft focus, faint motion blur, visible sensor noise, compressed JPEG look, centered subject, slight tilt. Amateur snapshot, NOT food photography, NOT restaurant plating, NO shallow depth of field, NO styling, NO magazine polish. No text, no logos.`;
+	if (prompt.length > PROMPT_LIMIT) {
+		console.warn(
+			`Prompt ${prompt.length} chars exceeds ${PROMPT_LIMIT}; truncating`,
+		);
+		return prompt.slice(0, PROMPT_LIMIT);
+	}
+	return prompt;
 }
 
 export async function generateMealImage(
@@ -60,6 +69,9 @@ export async function generateMealImage(
 	}
 
 	const prompt = buildPrompt(itemEn);
+	console.log(
+		`flux prompt (${prompt.length} chars) for item "${itemEn.slice(0, 60)}"`,
+	);
 	const response = (await ai.run(MODEL, {
 		prompt,
 		steps: 4,
