@@ -78,17 +78,20 @@ export async function generateMealImage(
 	console.log(
 		`image prompt (${prompt.length} chars) for item "${itemDe.slice(0, 60)}"`,
 	);
-	const response = (await ai.run(MODEL, {
-		prompt,
-		aspect_ratio: "1:1",
-		output_format: "jpg",
-		image_size: "1K",
-	} as Record<string, unknown>)) as
-		| { image?: string }
-		| ReadableStream
-		| Uint8Array
-		| ArrayBuffer
-		| string;
+	const response = (await ai.run(
+		MODEL,
+		{
+			prompt,
+			aspect_ratio: "1:1",
+			output_format: "jpg",
+			image_size: "1K",
+		} as Record<string, unknown>,
+		{ gateway: { id: "default" } },
+	)) as { image?: string } | ReadableStream | Uint8Array | ArrayBuffer | string;
+
+	console.log(
+		`${MODEL} response type: ${typeof response}, constructor: ${response?.constructor?.name}`,
+	);
 
 	if (typeof response === "string") return dataUriToBytes(response);
 	if (response instanceof ReadableStream) return readStream(response);
@@ -104,5 +107,7 @@ export async function generateMealImage(
 			return dataUriToBytes(response.image);
 		return base64ToBytes(response.image);
 	}
-	throw new Error(`${MODEL} returned unexpected response shape`);
+	throw new Error(
+		`${MODEL} returned unexpected response: ${JSON.stringify(response).slice(0, 200)}`,
+	);
 }
