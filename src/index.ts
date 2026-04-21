@@ -14,7 +14,12 @@ import { extractMenuFromImage, type MenuData } from "./lib/ocr";
 import { findMenuImageCandidates } from "./lib/scraper";
 import { renderSite } from "./lib/site";
 import { uploadMenuImage } from "./lib/storage";
-import { handleTelegramWebhook, sendMessage, sendPhoto } from "./lib/telegram";
+import {
+	handleTelegramWebhook,
+	sendMediaGroup,
+	sendMessage,
+	sendPhoto,
+} from "./lib/telegram";
 import { translateMeals } from "./lib/translate";
 
 async function storeMenuForUrl(
@@ -87,33 +92,40 @@ async function enrichMenu(
 	}
 
 	const days = [2, 3, 4, 5] as const;
-	const imageByDay: Record<keyof typeof DAY_COLUMNS, string | null> = {
-		2: null,
-		3: null,
-		4: null,
-		5: null,
+	const imagesByDay: Record<keyof typeof DAY_COLUMNS, string[]> = {
+		2: [],
+		3: [],
+		4: [],
+		5: [],
 	};
 
 	await Promise.all(
-		days.map(async (dow) => {
+		days.flatMap((dow) => {
 			const col = DAY_COLUMNS[dow];
 			const itemsEn = parseMealItems(mealsEn[col]);
-			if (itemsEn.length === 0) return;
-			try {
-				const bytes = await generateMealImage(env.AI, itemsEn);
-				const url = await uploadMenuImage(
-					env.MENU_IMAGES,
-					env.R2_PUBLIC_BASE_URL,
-					weekTuesday,
-					col,
-					bytes,
-				);
-				imageByDay[dow] = url;
-			} catch (e) {
-				console.error(`Image gen/upload failed for ${col}:`, e);
-			}
+			return itemsEn.map(async (item, idx) => {
+				try {
+					const bytes = await generateMealImage(env.AI, item);
+					const url = await uploadMenuImage(
+						env.MENU_IMAGES,
+						env.R2_PUBLIC_BASE_URL,
+						weekTuesday,
+						col,
+						idx,
+						bytes,
+					);
+					imagesByDay[dow][idx] = url;
+				} catch (e) {
+					console.error(`Image gen/upload failed for ${col}[${idx}]:`, e);
+				}
+			});
 		}),
 	);
+
+	const serialize = (urls: string[]): string | null =>
+		urls.filter(Boolean).length > 0
+			? JSON.stringify(urls.filter(Boolean))
+			: null;
 
 	await db
 		.update(menus)
@@ -122,10 +134,10 @@ async function enrichMenu(
 			wednesdayEn: mealsEn.wednesday,
 			thursdayEn: mealsEn.thursday,
 			fridayEn: mealsEn.friday,
-			tuesdayImage: imageByDay[2],
-			wednesdayImage: imageByDay[3],
-			thursdayImage: imageByDay[4],
-			fridayImage: imageByDay[5],
+			tuesdayImage: serialize(imagesByDay[2]),
+			wednesdayImage: serialize(imagesByDay[3]),
+			thursdayImage: serialize(imagesByDay[4]),
+			fridayImage: serialize(imagesByDay[5]),
 		})
 		.where(eq(menus.weekStart, weekTuesday));
 
@@ -264,11 +276,15 @@ export default {
 		const db = createDb(env.DB);
 
 		for (const message of batch.messages) {
-			const { chatId, text, imageUrl } = message.body;
+			const { chatId, text, imageUrls } = message.body;
 			try {
-				const res = imageUrl
-					? await sendPhoto(env.TELEGRAM_BOT_TOKEN, chatId, imageUrl, text)
-					: await sendMessage(env.TELEGRAM_BOT_TOKEN, chatId, text);
+				const urls = imageUrls ?? [];
+				const res =
+					urls.length >= 2
+						? await sendMediaGroup(env.TELEGRAM_BOT_TOKEN, chatId, urls, text)
+						: urls.length === 1
+							? await sendPhoto(env.TELEGRAM_BOT_TOKEN, chatId, urls[0], text)
+							: await sendMessage(env.TELEGRAM_BOT_TOKEN, chatId, text);
 
 				if (res.status === 403) {
 					console.log(`User ${chatId} blocked bot, deactivating`);

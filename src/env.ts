@@ -12,5 +12,5 @@ export interface Env {
 export interface NotificationMessage {
 	chatId: string;
 	text: string;
-	imageUrl?: string;
+	imageUrls?: string[];
 }

@@ -3,10 +3,12 @@ export async function uploadMenuImage(
 	baseUrl: string,
 	weekStart: string,
 	day: string,
+	index: number,
 	bytes: Uint8Array,
 	contentType = "image/png",
 ): Promise<string> {
-	const key = `${weekStart}/${day}.${contentType === "image/jpeg" ? "jpg" : "png"}`;
+	const ext = contentType === "image/jpeg" ? "jpg" : "png";
+	const key = `${weekStart}/${day}-${index}.${ext}`;
 	await bucket.put(key, bytes, {
 		httpMetadata: { contentType },
 	});

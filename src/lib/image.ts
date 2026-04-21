@@ -7,20 +7,38 @@ function base64ToBytes(base64: string): Uint8Array {
 	return bytes;
 }
 
-// Dish-specific hints appended to the prompt when a meal mentions a regional
-// specialty that a generic food model would render incorrectly.
-const DISH_HINTS: { match: RegExp; hint: string }[] = [
+// OCR-preserved prices like "11,90 €", "€ 11.90", "11,90EUR" end up in the
+// translated meal text and derail the image model. Strip them.
+function stripPrices(text: string): string {
+	return text
+		.replace(/[€$£]\s*\d+[.,]\d{1,2}/g, "")
+		.replace(/\d+[.,]\d{1,2}\s*(€|eur|euro)\b/gi, "")
+		.replace(/\s+/g, " ")
+		.trim();
+}
+
+// For dishes where the literal translated name misleads the image model, we
+// substitute / append a concrete visual description keyed to the visual
+// appearance of the actual dish, not an explanatory note. Flux-schnell ignores
+// meta-commentary like "Note: X refers to Y" — it responds to direct visual
+// language.
+const DISH_HINTS: { match: RegExp; visual: string }[] = [
 	{
 		match: /gr[üu]ne sauce|green sauce/i,
-		hint: 'Note: "Grüne Sauce" here refers to the Hessian specialty "Frankfurter Grüne Sauce" — a cold, creamy, bright green herb sauce made from seven fresh herbs (parsley, chives, chervil, borage, sorrel, salad burnet, cress), typically served with boiled potatoes and halved hard-boiled eggs.',
+		visual:
+			"The sauce labeled 'green sauce' is Frankfurter Grüne Sauce: a pale mint-green creamy yogurt-and-quark-based cold herb dressing, pourable and glossy, with visible tiny flecks of finely chopped parsley, chervil, chives, sorrel and cress. Not a thick puree, not pesto. Served drizzled around or over quartered hard-boiled eggs and halved boiled waxy potatoes sitting on the plate — sauce pools gently, does not coat everything.",
+	},
+	{
+		match: /kartoffelsalat|potato salad/i,
+		visual:
+			"The potato salad is German-style: cold, thinly sliced waxy potatoes glistening in either a light broth-and-vinegar dressing (southern/Hessian) or a creamy mayonnaise-and-mustard dressing (northern), with finely chopped chives or parsley and small diced pickles visible. Slices are thin and uniform, not chunky American cubes.",
 	},
 ];
 
-function buildPrompt(itemsEn: string[]): string {
-	const dish = itemsEn.join(", ");
-	const joined = itemsEn.join(" | ");
-	const hints = DISH_HINTS.filter((h) => h.match.test(joined))
-		.map((h) => h.hint)
+function buildPrompt(itemEn: string): string {
+	const dish = stripPrices(itemEn);
+	const hints = DISH_HINTS.filter((h) => h.match.test(dish))
+		.map((h) => h.visual)
 		.join(" ");
 	const extra = hints ? ` ${hints}` : "";
 	return `Casual overhead smartphone snapshot of a daily lunch special from a small German neighborhood butcher shop (Metzgerei), packed for takeaway: ${dish}.${extra} Served in a disposable takeaway container — a paper tray, compostable kraft bowl, or clear plastic Imbiss container with a clip-on lid — placed on a plain shop counter or simple wooden surface. Honest portion sizes, home-style plating, nothing fancy. Lit with the flat mixed fluorescent and daylight of a small shop interior. Shot on a mid-range smartphone: slightly compressed dynamic range, modest depth of field, subtle sensor noise, everything roughly in focus, amateur framing. Not professional food photography, not a restaurant plate, not glossy magazine styling. No text, no logos, no watermarks.`;
@@ -28,13 +46,13 @@ function buildPrompt(itemsEn: string[]): string {
 
 export async function generateMealImage(
 	ai: Ai,
-	itemsEn: string[],
+	itemEn: string,
 ): Promise<Uint8Array> {
-	if (itemsEn.length === 0) {
-		throw new Error("generateMealImage: empty items");
+	if (!itemEn.trim()) {
+		throw new Error("generateMealImage: empty item");
 	}
 
-	const prompt = buildPrompt(itemsEn);
+	const prompt = buildPrompt(itemEn);
 	const response = (await ai.run(MODEL, {
 		prompt,
 		steps: 4,

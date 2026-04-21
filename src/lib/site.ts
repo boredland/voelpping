@@ -8,7 +8,7 @@ import {
 	getCalendarWeek,
 	getCurrentWeekTuesday,
 } from "./dates";
-import { parseMealItems } from "./meals";
+import { parseImageUrls, parseMealItems } from "./meals";
 
 function escapeHtml(s: string): string {
 	return s
@@ -41,15 +41,21 @@ export async function renderSite(
 
 	function renderMealCell(
 		value: string | null,
-		imageUrl: string | null,
+		imageValue: string | null,
 	): string {
 		const items = parseMealItems(value);
 		if (items.length === 0) return "";
 		const list = `<ul>${items.map((i) => `<li>${escapeHtml(i)}</li>`).join("")}</ul>`;
-		const img = imageUrl
-			? `<img class="meal-img" src="${escapeHtml(imageUrl)}" alt="" loading="lazy">`
+		const urls = parseImageUrls(imageValue);
+		const imgs = urls.length
+			? `<div class="meal-imgs">${urls
+					.map(
+						(u) =>
+							`<img class="meal-img" src="${escapeHtml(u)}" alt="" loading="lazy">`,
+					)
+					.join("")}</div>`
 			: "";
-		return `${list}${img}`;
+		return `${list}${imgs}`;
 	}
 
 	const DAY_COLS = {
@@ -146,7 +152,8 @@ export async function renderSite(
 		td:first-child { font-weight: 600; white-space: nowrap; width: 120px; vertical-align: top; }
 		td ul { margin: 0; padding-left: 1.2em; }
 		td li { margin-bottom: 0.25rem; }
-		.meal-img { display: block; width: 100%; max-width: 280px; aspect-ratio: 1 / 1; object-fit: cover; border-radius: 6px; margin-top: 0.5rem; background: var(--bg); }
+		.meal-imgs { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem; }
+		.meal-img { display: block; flex: 1 1 140px; max-width: 280px; aspect-ratio: 1 / 1; object-fit: cover; border-radius: 6px; background: var(--bg); }
 		.subscribe-link { display: inline-block; background: var(--link-bg); color: #fff; text-decoration: none; padding: 0.75rem 1.5rem; border-radius: 6px; font-weight: 600; margin-top: 0.5rem; }
 		.subscribe-link:hover { background: var(--link-bg-hover); }
 		.empty { color: var(--text-muted); font-style: italic; }

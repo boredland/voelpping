@@ -8,7 +8,7 @@ import {
 	DAY_NAMES_EN,
 	getCurrentWeekTuesday,
 } from "./dates";
-import { parseMealItems } from "./meals";
+import { parseImageUrls, parseMealItems } from "./meals";
 
 export async function enqueueDailyNotifications(
 	db: Db,
@@ -41,7 +41,7 @@ export async function enqueueDailyNotifications(
 	const imageColumn = `${dayColumn}Image` as const;
 	const itemsEnRaw = parseMealItems(m[enColumn]);
 	const itemsEn = itemsEnRaw.length > 0 ? itemsEnRaw : itemsDe;
-	const imageUrl = m[imageColumn] ?? undefined;
+	const imageUrls = parseImageUrls(m[imageColumn]);
 
 	const listDe = itemsDe.map((i) => `• ${i}`).join("\n");
 	const listEn = itemsEn.map((i) => `• ${i}`).join("\n");
@@ -61,7 +61,7 @@ export async function enqueueDailyNotifications(
 	const messages: NotificationMessage[] = allActive.map((sub) => ({
 		chatId: sub.chatId,
 		text: sub.language === "en" ? textEn : textDe,
-		imageUrl,
+		imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
 	}));
 
 	for (let i = 0; i < messages.length; i += 10) {

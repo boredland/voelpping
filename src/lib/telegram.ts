@@ -70,7 +70,40 @@ async function sendPhoto(
 	return res;
 }
 
-export { sendMessage, sendPhoto };
+// sendMediaGroup takes 2-10 photos and shows them as a single album message.
+// The caption on the first item is what Telegram surfaces for the album.
+async function sendMediaGroup(
+	token: string,
+	chatId: string,
+	photoUrls: string[],
+	caption: string,
+): Promise<Response> {
+	const urls = photoUrls.slice(0, 10);
+	const short = caption.length <= CAPTION_LIMIT;
+	const media = urls.map((url, i) => ({
+		type: "photo" as const,
+		media: url,
+		...(i === 0 && short ? { caption, parse_mode: "HTML" } : {}),
+	}));
+	const res = await fetch(
+		`https://api.telegram.org/bot${token}/sendMediaGroup`,
+		{
+			method: "POST",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify({ chat_id: chatId, media }),
+		},
+	);
+	if (!res.ok) {
+		const body = await res.clone().text();
+		console.error(`Telegram sendMediaGroup failed: ${res.status} ${body}`);
+	}
+	if (!short) {
+		await sendMessage(token, chatId, caption);
+	}
+	return res;
+}
+
+export { sendMediaGroup, sendMessage, sendPhoto };
 
 function detectLangFromCode(code: string | undefined): "de" | "en" {
 	return code?.toLowerCase().startsWith("de") ? "de" : "en";
