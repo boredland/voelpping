@@ -109,11 +109,7 @@ async function enrichMenu(
 			const itemsDe = parseMealItems(meals[col]);
 			return itemsDe.map(async (item, idx) => {
 				try {
-					const bytes = await generateMealImage(
-						env.GOOGLE_AI_API_KEY,
-						env.CF_AIG_TOKEN,
-						item,
-					);
+					const bytes = await generateMealImage(env.AI, item);
 					const url = await uploadMenuImage(
 						env.MENU_IMAGES,
 						env.R2_PUBLIC_BASE_URL,
@@ -121,7 +117,7 @@ async function enrichMenu(
 						col,
 						idx,
 						bytes,
-						"image/jpeg",
+						"image/png",
 					);
 					imagesByDay[dow][idx] = url;
 				} catch (e) {
@@ -237,21 +233,6 @@ export default {
 				return new Response("triggered");
 			} catch (e) {
 				console.error("Manual trigger error:", e);
-				return new Response(`error: ${e}`, { status: 500 });
-			}
-		}
-
-		if (url.pathname === `/test-ai/${env.TELEGRAM_BOT_TOKEN}`) {
-			try {
-				const bytes = await generateMealImage(
-					env.GOOGLE_AI_API_KEY,
-					env.CF_AIG_TOKEN,
-					"Frankfurter Grüne Sauce mit Eiern und Kartoffeln",
-				);
-				return new Response(bytes, {
-					headers: { "content-type": "image/png" },
-				});
-			} catch (e) {
 				return new Response(`error: ${e}`, { status: 500 });
 			}
 		}
