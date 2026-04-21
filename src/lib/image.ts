@@ -1,4 +1,4 @@
-const MODEL = "@cf/black-forest-labs/flux-1-schnell";
+const MODEL = "@cf/bytedance/stable-diffusion-xl-lightning";
 
 function base64ToBytes(base64: string): Uint8Array {
 	const binary = atob(base64);
@@ -42,22 +42,41 @@ const DISH_HINTS: { match: RegExp; visual: string }[] = [
 
 const PROMPT_LIMIT = 2048;
 
-function buildPrompt(itemEn: string): string {
+const NEGATIVE_PROMPT =
+	"lemon, lemon wedge, lemon slice, citrus, parsley sprig, rosemary sprig, herb garnish, decorative herbs, microgreens, edible flowers, garnish, fork, spoon, knife, chopsticks, cutlery, utensils, plate, bowl on the side, container lid, plastic lid, clamshell lid closed, napkin, tissue, paper towel, side container, side dish, bread, bread roll, butter, drink, cup, glass, bottle, can, straw, text, words, letters, numbers, logo, watermark, brand, label, fine dining, restaurant plating, white tablecloth, marble counter, shallow depth of field, strong bokeh, studio lighting, softbox, backlit, rim light, artistic composition, flat lay styling, food magazine, cookbook, ramekins of sauce, dipping sauce cup";
+
+function buildPositive(itemEn: string): string {
 	const dish = stripPrices(itemEn);
 	const hints = DISH_HINTS.filter((h) => h.match.test(dish))
 		.map((h) => h.visual)
 		.join(" ");
 	const extra = hints ? ` ${hints}` : "";
-	const prompt = `STRICT: render ONLY the food items explicitly named below — no invented sides, no garnishes, no lemon, no herb sprigs, no onion, no bread, no pickles, no lettuce. Empty tray space is fine.
-
-Overhead phone snapshot of a takeaway lunch from a small German neighborhood butcher (Metzgerei): ${dish}.${extra} Served in a plain open white styrofoam Imbissschale (shallow rectangular EPS clamshell base, no lid visible), on a cheap wooden counter. Nothing else in frame: no cutlery (no fork/spoon/knife), no lid, no napkin, no side containers, no drinks, no decorative garnish. Flat greenish shop fluorescent or cheap phone flash — harsh direct light, flat shadows, slight highlight blow. Handheld mid-range smartphone: soft focus, faint motion blur, visible sensor noise, compressed JPEG look, centered subject, slight tilt. Amateur snapshot, NOT food photography, NOT restaurant plating, NO shallow depth of field, NO styling, NO magazine polish. No text, no logos.`;
+	const prompt = `Overhead phone snapshot of a takeaway lunch from a small German neighborhood butcher (Metzgerei): ${dish}.${extra} Served in a plain open white styrofoam Imbissschale (shallow rectangular EPS foam clamshell tray, base only, lid flipped open behind it or not visible), on a cheap wooden counter. Only the food items named above are in the tray — nothing else. Flat slightly greenish shop fluorescent or a cheap phone flash: harsh direct light, flat shadows, slight highlight blow on wet surfaces. Handheld mid-range smartphone, portrait crop: soft focus, faint motion blur, visible sensor noise, compressed JPEG look, centered subject, slight tilt. Amateur snapshot aesthetic.`;
 	if (prompt.length > PROMPT_LIMIT) {
 		console.warn(
-			`Prompt ${prompt.length} chars exceeds ${PROMPT_LIMIT}; truncating`,
+			`Positive prompt ${prompt.length} chars exceeds ${PROMPT_LIMIT}; truncating`,
 		);
 		return prompt.slice(0, PROMPT_LIMIT);
 	}
 	return prompt;
+}
+
+async function readStream(stream: ReadableStream): Promise<Uint8Array> {
+	const reader = stream.getReader();
+	const chunks: Uint8Array[] = [];
+	while (true) {
+		const { done, value } = await reader.read();
+		if (done) break;
+		if (value) chunks.push(value);
+	}
+	const total = chunks.reduce((n, c) => n + c.length, 0);
+	const bytes = new Uint8Array(total);
+	let offset = 0;
+	for (const c of chunks) {
+		bytes.set(c, offset);
+		offset += c.length;
+	}
+	return bytes;
 }
 
 export async function generateMealImage(
@@ -68,35 +87,32 @@ export async function generateMealImage(
 		throw new Error("generateMealImage: empty item");
 	}
 
-	const prompt = buildPrompt(itemEn);
+	const prompt = buildPositive(itemEn);
 	console.log(
-		`flux prompt (${prompt.length} chars) for item "${itemEn.slice(0, 60)}"`,
+		`image prompt (${prompt.length} chars, -${NEGATIVE_PROMPT.length}) for item "${itemEn.slice(0, 60)}"`,
 	);
 	const response = (await ai.run(MODEL, {
 		prompt,
-		steps: 4,
-	} as Record<string, unknown>)) as { image?: string } | ReadableStream;
+		negative_prompt: NEGATIVE_PROMPT,
+		num_steps: 8,
+		height: 1024,
+		width: 1024,
+	} as Record<string, unknown>)) as
+		| { image?: string }
+		| ReadableStream
+		| Uint8Array
+		| ArrayBuffer;
 
-	if (response instanceof ReadableStream) {
-		const reader = response.getReader();
-		const chunks: Uint8Array[] = [];
-		while (true) {
-			const { done, value } = await reader.read();
-			if (done) break;
-			if (value) chunks.push(value);
-		}
-		const total = chunks.reduce((n, c) => n + c.length, 0);
-		const bytes = new Uint8Array(total);
-		let offset = 0;
-		for (const c of chunks) {
-			bytes.set(c, offset);
-			offset += c.length;
-		}
-		return bytes;
+	if (response instanceof ReadableStream) return readStream(response);
+	if (response instanceof ArrayBuffer) return new Uint8Array(response);
+	if (response instanceof Uint8Array) return response;
+	if (
+		response &&
+		typeof response === "object" &&
+		"image" in response &&
+		response.image
+	) {
+		return base64ToBytes(response.image);
 	}
-
-	if (!response.image) {
-		throw new Error("flux-schnell returned no image");
-	}
-	return base64ToBytes(response.image);
+	throw new Error(`${MODEL} returned unexpected response shape`);
 }
