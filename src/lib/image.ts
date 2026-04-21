@@ -26,12 +26,12 @@ const DISH_HINTS: { match: RegExp; visual: string }[] = [
 	{
 		match: /gr[üu]ne sauce|green sauce/i,
 		visual:
-			"The sauce labeled 'green sauce' is Frankfurter Grüne Sauce: a pale mint-green creamy yogurt-and-quark-based cold herb dressing, pourable and glossy, with visible tiny flecks of finely chopped parsley, chervil, chives, sorrel and cress. Not a thick puree, not pesto. Served drizzled around or over quartered hard-boiled eggs and halved boiled waxy potatoes sitting on the plate — sauce pools gently, does not coat everything.",
+			"The 'green sauce' is Frankfurter Grüne Sauce, a traditional Hessian cold herb sauce: a sour-cream base with coarsely chopped boiled eggs blended in, salt and spices, and a heavy amount of fresh herbs (parsley, chervil, chives, sorrel, cress, borage, salad burnet) pulsed in a blender but NOT to a smooth puree — the finished sauce is chunky and textured, pale mint-to-sage green, with visible small pieces of egg white and bright flecks of chopped herb suspended in creamy sour cream. Served as a pool or small bowl of sauce with halved hard-boiled eggs and halved boiled waxy yellow potatoes arranged next to it on the side — eggs and potatoes are plain and undressed, the sauce stays in its own pool, it is NOT drizzled over the eggs or potatoes.",
 	},
 	{
 		match: /kartoffelsalat|potato salad/i,
 		visual:
-			"The potato salad is German-style: cold, thinly sliced waxy potatoes glistening in either a light broth-and-vinegar dressing (southern/Hessian) or a creamy mayonnaise-and-mustard dressing (northern), with finely chopped chives or parsley and small diced pickles visible. Slices are thin and uniform, not chunky American cubes.",
+			"The potato salad is German-style: cold, thinly sliced waxy potatoes (thin uniform coin slices about 3mm, NOT cubes) glistening in either a light broth-and-vinegar dressing (southern/Hessian) or a creamy mayonnaise-and-mustard dressing (northern), with finely chopped chives or parsley and small diced pickles visible.",
 	},
 ];
 
@@ -41,7 +41,7 @@ function buildPrompt(itemEn: string): string {
 		.map((h) => h.visual)
 		.join(" ");
 	const extra = hints ? ` ${hints}` : "";
-	return `Casual overhead smartphone snapshot of a daily lunch special from a small German neighborhood butcher shop (Metzgerei), packed for takeaway: ${dish}.${extra} Served in a disposable takeaway container — a paper tray, compostable kraft bowl, or clear plastic Imbiss container with a clip-on lid — placed on a plain shop counter or simple wooden surface. Honest portion sizes, home-style plating, nothing fancy. Lit with the flat mixed fluorescent and daylight of a small shop interior. Shot on a mid-range smartphone: slightly compressed dynamic range, modest depth of field, subtle sensor noise, everything roughly in focus, amateur framing. Not professional food photography, not a restaurant plate, not glossy magazine styling. No text, no logos, no watermarks.`;
+	return `Quick overhead phone snapshot of a daily lunch special from a small German neighborhood butcher shop (Metzgerei), packed for takeaway: ${dish}.${extra} Served in a plain open disposable takeaway container — paper tray or kraft-paper bowl — placed on a plain shop counter or cheap wooden table. Honest portion sizes, home-style plating, nothing fancy. Nothing else in the frame: NO cutlery of any kind (no fork, no spoon, no knife, no chopsticks), NO container lid, NO napkin, NO side containers, NO packaging, NO drinks, NO garnish-placement — only the food in its one container. Lit by the flat slightly greenish overhead fluorescent of a small shop interior or by a cheap phone flash: harsh direct light, flat shadows, slightly blown highlights on wet surfaces. Shot handheld on a cheap mid-range smartphone: soft focus, faint motion blur, visible sensor noise, compressed JPEG look, everything roughly in focus but nothing crisp, centered subject with no compositional care, slight camera tilt. Amateur snapshot aesthetic. NOT food photography, NOT restaurant plating, NO shallow depth of field, NO color grading, NO styling, NO magazine polish. No text, no logos, no watermarks.`;
 }
 
 export async function generateMealImage(
