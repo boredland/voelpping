@@ -29,16 +29,24 @@ export async function enqueueDailyNotifications(
 		return;
 	}
 
+	const m = menu[0];
 	const dayColumn = DAY_COLUMNS[todayDow as keyof typeof DAY_COLUMNS];
-	const items = parseMealItems(menu[0][dayColumn]);
-	if (items.length === 0) {
+	const itemsDe = parseMealItems(m[dayColumn]);
+	if (itemsDe.length === 0) {
 		console.log(`No meal for ${dayColumn}`);
 		return;
 	}
 
-	const itemList = items.map((i) => `• ${i}`).join("\n");
-	const textDe = `Guten Appetit! Heute bei Völp:\n\n<b>${DAY_NAMES_DE[todayDow]}</b>\n${itemList}`;
-	const textEn = `Enjoy your meal! Today at Völp:\n\n<b>${DAY_NAMES_EN[todayDow]}</b>\n${itemList}`;
+	const enColumn = `${dayColumn}En` as const;
+	const imageColumn = `${dayColumn}Image` as const;
+	const itemsEnRaw = parseMealItems(m[enColumn]);
+	const itemsEn = itemsEnRaw.length > 0 ? itemsEnRaw : itemsDe;
+	const imageUrl = m[imageColumn] ?? undefined;
+
+	const listDe = itemsDe.map((i) => `• ${i}`).join("\n");
+	const listEn = itemsEn.map((i) => `• ${i}`).join("\n");
+	const textDe = `Guten Appetit! Heute bei Völp:\n\n<b>${DAY_NAMES_DE[todayDow]}</b>\n${listDe}`;
+	const textEn = `Enjoy your meal! Today at Völp:\n\n<b>${DAY_NAMES_EN[todayDow]}</b>\n${listEn}`;
 
 	const allActive = await db
 		.select()
@@ -53,6 +61,7 @@ export async function enqueueDailyNotifications(
 	const messages: NotificationMessage[] = allActive.map((sub) => ({
 		chatId: sub.chatId,
 		text: sub.language === "en" ? textEn : textDe,
+		imageUrl,
 	}));
 
 	for (let i = 0; i < messages.length; i += 10) {

@@ -23,7 +23,7 @@ async function sendMessage(
 	token: string,
 	chatId: string,
 	text: string,
-): Promise<void> {
+): Promise<Response> {
 	const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
 		method: "POST",
 		headers: { "content-type": "application/json" },
@@ -34,12 +34,43 @@ async function sendMessage(
 		}),
 	});
 	if (!res.ok) {
-		const body = await res.text();
+		const body = await res.clone().text();
 		console.error(`Telegram sendMessage failed: ${res.status} ${body}`);
 	}
+	return res;
 }
 
-export { sendMessage };
+// Telegram caption limit is 1024 characters. Longer messages get split: photo
+// with a truncated caption, followed by the full text as a separate message.
+const CAPTION_LIMIT = 1024;
+
+async function sendPhoto(
+	token: string,
+	chatId: string,
+	photoUrl: string,
+	caption: string,
+): Promise<Response> {
+	const short = caption.length <= CAPTION_LIMIT;
+	const res = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
+		method: "POST",
+		headers: { "content-type": "application/json" },
+		body: JSON.stringify({
+			chat_id: chatId,
+			photo: photoUrl,
+			...(short ? { caption, parse_mode: "HTML" } : {}),
+		}),
+	});
+	if (!res.ok) {
+		const body = await res.clone().text();
+		console.error(`Telegram sendPhoto failed: ${res.status} ${body}`);
+	}
+	if (!short) {
+		await sendMessage(token, chatId, caption);
+	}
+	return res;
+}
+
+export { sendMessage, sendPhoto };
 
 function detectLangFromCode(code: string | undefined): "de" | "en" {
 	return code?.toLowerCase().startsWith("de") ? "de" : "en";
@@ -170,12 +201,14 @@ export async function handleTelegramWebhook(
 		const dn = de ? DAY_NAMES_DE : DAY_NAMES_EN;
 		const todayDow = getBerlinDayOfWeek();
 		const minDow = todayDow >= 2 && todayDow <= 5 ? todayDow : 2;
+		const pick = (enVal: string | null, deVal: string | null) =>
+			de ? deVal : (enVal ?? deVal);
 		const days = (
 			[
-				[2, dn[2], parseMealItems(m.tuesday)],
-				[3, dn[3], parseMealItems(m.wednesday)],
-				[4, dn[4], parseMealItems(m.thursday)],
-				[5, dn[5], parseMealItems(m.friday)],
+				[2, dn[2], parseMealItems(pick(m.tuesdayEn, m.tuesday))],
+				[3, dn[3], parseMealItems(pick(m.wednesdayEn, m.wednesday))],
+				[4, dn[4], parseMealItems(pick(m.thursdayEn, m.thursday))],
+				[5, dn[5], parseMealItems(pick(m.fridayEn, m.friday))],
 			] as const
 		).filter(([dow, , items]) => dow >= minDow && items.length > 0);
 

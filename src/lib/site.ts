@@ -39,22 +39,31 @@ export async function renderSite(
 	const kw = getCalendarWeek(weekTuesday);
 	const range = formatMenuWeekRange(weekTuesday);
 
-	function renderMealCell(value: string | null): string {
+	function renderMealCell(
+		value: string | null,
+		imageUrl: string | null,
+	): string {
 		const items = parseMealItems(value);
 		if (items.length === 0) return "";
-		return `<ul>${items.map((i) => `<li>${escapeHtml(i)}</li>`).join("")}</ul>`;
+		const list = `<ul>${items.map((i) => `<li>${escapeHtml(i)}</li>`).join("")}</ul>`;
+		const img = imageUrl
+			? `<img class="meal-img" src="${escapeHtml(imageUrl)}" alt="" loading="lazy">`
+			: "";
+		return `${list}${img}`;
 	}
+
+	const DAY_COLS = {
+		2: { de: "tuesday", en: "tuesdayEn", img: "tuesdayImage" },
+		3: { de: "wednesday", en: "wednesdayEn", img: "wednesdayImage" },
+		4: { de: "thursday", en: "thursdayEn", img: "thursdayImage" },
+		5: { de: "friday", en: "fridayEn", img: "fridayImage" },
+	} as const;
 
 	const mealRowsDe = menu
 		? ([2, 3, 4, 5] as const)
 				.map((d) => {
-					const col = {
-						2: "tuesday",
-						3: "wednesday",
-						4: "thursday",
-						5: "friday",
-					} as const;
-					const cell = renderMealCell(menu[col[d]]);
+					const cols = DAY_COLS[d];
+					const cell = renderMealCell(menu[cols.de], menu[cols.img]);
 					if (!cell) return "";
 					return `<tr><td>${DAY_NAMES_DE[d]}</td><td>${cell}</td></tr>`;
 				})
@@ -64,13 +73,11 @@ export async function renderSite(
 	const mealRowsEn = menu
 		? ([2, 3, 4, 5] as const)
 				.map((d) => {
-					const col = {
-						2: "tuesday",
-						3: "wednesday",
-						4: "thursday",
-						5: "friday",
-					} as const;
-					const cell = renderMealCell(menu[col[d]]);
+					const cols = DAY_COLS[d];
+					const cell = renderMealCell(
+						menu[cols.en] ?? menu[cols.de],
+						menu[cols.img],
+					);
 					if (!cell) return "";
 					return `<tr><td>${DAY_NAMES_EN[d]}</td><td>${cell}</td></tr>`;
 				})
@@ -139,6 +146,7 @@ export async function renderSite(
 		td:first-child { font-weight: 600; white-space: nowrap; width: 120px; vertical-align: top; }
 		td ul { margin: 0; padding-left: 1.2em; }
 		td li { margin-bottom: 0.25rem; }
+		.meal-img { display: block; width: 100%; max-width: 280px; aspect-ratio: 1 / 1; object-fit: cover; border-radius: 6px; margin-top: 0.5rem; background: var(--bg); }
 		.subscribe-link { display: inline-block; background: var(--link-bg); color: #fff; text-decoration: none; padding: 0.75rem 1.5rem; border-radius: 6px; font-weight: 600; margin-top: 0.5rem; }
 		.subscribe-link:hover { background: var(--link-bg-hover); }
 		.empty { color: var(--text-muted); font-style: italic; }

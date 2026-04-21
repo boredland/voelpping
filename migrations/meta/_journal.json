@@ -15,6 +15,13 @@
 			"when": 1776896400000,
 			"tag": "0001_swap_weekdays_for_language",
 			"breakpoints": true
+		},
+		{
+			"idx": 2,
+			"version": "6",
+			"when": 1777881600000,
+			"tag": "0002_add_translations_and_images",
+			"breakpoints": true
 		}
 	]
 }

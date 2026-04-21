@@ -27,8 +27,13 @@ queue = "voelpping-notifications"
 max_batch_size = 10
 max_retries = 3
 
+[[r2_buckets]]
+binding = "MENU_IMAGES"
+bucket_name = "voelpping-menu-images"
+
 [vars]
 BOT_USERNAME = "voelp_bot"
+R2_PUBLIC_BASE_URL = "https://pub-0a67ad8e5d5946bc94e2075980b25a29.r2.dev"
 
 [ai]
 binding = "AI"

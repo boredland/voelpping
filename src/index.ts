@@ -2,12 +2,20 @@ import { eq } from "drizzle-orm";
 import { createDb } from "./db/client";
 import { menus, subscribers } from "./db/schema";
 import type { Env, NotificationMessage } from "./env";
-import { getBerlinDayOfWeek, getCurrentWeekTuesday } from "./lib/dates";
+import {
+	DAY_COLUMNS,
+	getBerlinDayOfWeek,
+	getCurrentWeekTuesday,
+} from "./lib/dates";
+import { generateMealImage } from "./lib/image";
+import { parseMealItems } from "./lib/meals";
 import { enqueueDailyNotifications } from "./lib/notify";
-import { extractMenuFromImage } from "./lib/ocr";
+import { extractMenuFromImage, type MenuData } from "./lib/ocr";
 import { findMenuImageCandidates } from "./lib/scraper";
 import { renderSite } from "./lib/site";
-import { handleTelegramWebhook } from "./lib/telegram";
+import { uploadMenuImage } from "./lib/storage";
+import { handleTelegramWebhook, sendMessage, sendPhoto } from "./lib/telegram";
+import { translateMeals } from "./lib/translate";
 
 async function storeMenuForUrl(
 	db: ReturnType<typeof createDb>,
@@ -29,6 +37,14 @@ async function storeMenuForUrl(
 			wednesday: meals.wednesday,
 			thursday: meals.thursday,
 			friday: meals.friday,
+			tuesdayEn: null,
+			wednesdayEn: null,
+			thursdayEn: null,
+			fridayEn: null,
+			tuesdayImage: null,
+			wednesdayImage: null,
+			thursdayImage: null,
+			fridayImage: null,
 			rawOcr: raw,
 		})
 		.onConflictDoUpdate({
@@ -39,12 +55,81 @@ async function storeMenuForUrl(
 				wednesday: meals.wednesday,
 				thursday: meals.thursday,
 				friday: meals.friday,
+				tuesdayEn: null,
+				wednesdayEn: null,
+				thursdayEn: null,
+				fridayEn: null,
+				tuesdayImage: null,
+				wednesdayImage: null,
+				thursdayImage: null,
+				fridayImage: null,
 				rawOcr: raw,
 			},
 		});
 
 	console.log(`Menu stored for week ${weekTuesday}`);
+	await enrichMenu(db, env, weekTuesday, meals);
 	return true;
+}
+
+async function enrichMenu(
+	db: ReturnType<typeof createDb>,
+	env: Env,
+	weekTuesday: string,
+	meals: MenuData,
+): Promise<void> {
+	let mealsEn: MenuData;
+	try {
+		mealsEn = await translateMeals(env.DEEPL_API_KEY, meals);
+	} catch (e) {
+		console.error("Translation failed:", e);
+		return;
+	}
+
+	const days = [2, 3, 4, 5] as const;
+	const imageByDay: Record<keyof typeof DAY_COLUMNS, string | null> = {
+		2: null,
+		3: null,
+		4: null,
+		5: null,
+	};
+
+	await Promise.all(
+		days.map(async (dow) => {
+			const col = DAY_COLUMNS[dow];
+			const itemsEn = parseMealItems(mealsEn[col]);
+			if (itemsEn.length === 0) return;
+			try {
+				const bytes = await generateMealImage(env.AI, itemsEn);
+				const url = await uploadMenuImage(
+					env.MENU_IMAGES,
+					env.R2_PUBLIC_BASE_URL,
+					weekTuesday,
+					col,
+					bytes,
+				);
+				imageByDay[dow] = url;
+			} catch (e) {
+				console.error(`Image gen/upload failed for ${col}:`, e);
+			}
+		}),
+	);
+
+	await db
+		.update(menus)
+		.set({
+			tuesdayEn: mealsEn.tuesday,
+			wednesdayEn: mealsEn.wednesday,
+			thursdayEn: mealsEn.thursday,
+			fridayEn: mealsEn.friday,
+			tuesdayImage: imageByDay[2],
+			wednesdayImage: imageByDay[3],
+			thursdayImage: imageByDay[4],
+			fridayImage: imageByDay[5],
+		})
+		.where(eq(menus.weekStart, weekTuesday));
+
+	console.log(`Enriched menu for week ${weekTuesday}`);
 }
 
 async function scrapeAndStore(
@@ -179,20 +264,11 @@ export default {
 		const db = createDb(env.DB);
 
 		for (const message of batch.messages) {
-			const { chatId, text } = message.body;
+			const { chatId, text, imageUrl } = message.body;
 			try {
-				const res = await fetch(
-					`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`,
-					{
-						method: "POST",
-						headers: { "content-type": "application/json" },
-						body: JSON.stringify({
-							chat_id: chatId,
-							text,
-							parse_mode: "HTML",
-						}),
-					},
-				);
+				const res = imageUrl
+					? await sendPhoto(env.TELEGRAM_BOT_TOKEN, chatId, imageUrl, text)
+					: await sendMessage(env.TELEGRAM_BOT_TOKEN, chatId, text);
 
 				if (res.status === 403) {
 					console.log(`User ${chatId} blocked bot, deactivating`);
