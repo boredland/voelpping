@@ -1,13 +1,6 @@
 const GATEWAY_BASE =
 	"https://gateway.ai.cloudflare.com/v1/cd1e88db5a44de0f45317275cbcef879/default/google-ai-studio";
-const IMAGEN_MODEL = "imagen-4.0-fast-generate-001";
-
-function base64ToBytes(base64: string): Uint8Array {
-	const binary = atob(base64);
-	const bytes = new Uint8Array(binary.length);
-	for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-	return bytes;
-}
+const MODEL = "gemini-2.5-flash-image";
 
 function stripPrices(text: string): string {
 	return text
@@ -44,8 +37,20 @@ function buildPrompt(itemDe: string): string {
 	return `Handyfoto von oben: Mittagstisch-Gericht aus einer kleinen deutschen Metzgerei, zum Mitnehmen: ${dish}.${extra} In einer weißen Styropor-Imbissschale auf einer einfachen Holztheke. Nur die genannten Speisen in der Schale — keine Extras, keine Deko, keine Zitrone, keine Petersilie, kein Besteck, kein Deckel. Flaches Neonlicht, Handykamera-Ästhetik.`;
 }
 
-interface ImagenResponse {
-	predictions?: { bytesBase64Encoded?: string; mimeType?: string }[];
+function base64ToBytes(base64: string): Uint8Array {
+	const binary = atob(base64);
+	const bytes = new Uint8Array(binary.length);
+	for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+	return bytes;
+}
+
+interface GeminiResponse {
+	candidates?: {
+		content?: {
+			parts?: { inline_data?: { mime_type?: string; data?: string } }[];
+		};
+	}[];
+	error?: { message?: string; code?: number };
 }
 
 export async function generateMealImage(
@@ -59,10 +64,10 @@ export async function generateMealImage(
 
 	const prompt = buildPrompt(itemDe);
 	console.log(
-		`imagen prompt (${prompt.length} chars) for item "${itemDe.slice(0, 60)}"`,
+		`gemini prompt (${prompt.length} chars) for item "${itemDe.slice(0, 60)}"`,
 	);
 
-	const url = `${GATEWAY_BASE}/v1beta/models/${IMAGEN_MODEL}:predict`;
+	const url = `${GATEWAY_BASE}/v1beta/models/${MODEL}:generateContent`;
 	const res = await fetch(url, {
 		method: "POST",
 		headers: {
@@ -71,23 +76,31 @@ export async function generateMealImage(
 			"cf-aig-authorization": `Bearer ${gatewayToken}`,
 		},
 		body: JSON.stringify({
-			instances: [{ prompt }],
-			parameters: { sampleCount: 1, aspectRatio: "1:1" },
+			contents: [{ parts: [{ text: prompt }] }],
+			generationConfig: {
+				responseModalities: ["IMAGE"],
+				imageConfig: { aspectRatio: "1:1" },
+			},
 		}),
 	});
 
 	if (!res.ok) {
 		const body = await res.text();
-		throw new Error(`Imagen ${res.status}: ${body.slice(0, 300)}`);
+		throw new Error(`Gemini ${res.status}: ${body.slice(0, 300)}`);
 	}
 
-	const data = (await res.json()) as ImagenResponse;
-	const prediction = data.predictions?.[0];
-	if (!prediction?.bytesBase64Encoded) {
+	const data = (await res.json()) as GeminiResponse;
+	if (data.error) {
+		throw new Error(`Gemini error: ${data.error.message}`);
+	}
+
+	const parts = data.candidates?.[0]?.content?.parts ?? [];
+	const imagePart = parts.find((p) => p.inline_data?.data);
+	if (!imagePart?.inline_data?.data) {
 		throw new Error(
-			`Imagen returned no image: ${JSON.stringify(data).slice(0, 300)}`,
+			`Gemini returned no image: ${JSON.stringify(data).slice(0, 300)}`,
 		);
 	}
 
-	return base64ToBytes(prediction.bytesBase64Encoded);
+	return base64ToBytes(imagePart.inline_data.data);
 }
