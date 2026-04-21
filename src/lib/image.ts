@@ -1,6 +1,6 @@
 const GATEWAY_BASE =
 	"https://gateway.ai.cloudflare.com/v1/cd1e88db5a44de0f45317275cbcef879/default/google-ai-studio";
-const IMAGEN_MODEL = "imagen-3.0-generate-001";
+const IMAGEN_MODEL = "imagen-4.0-fast-generate-001";
 
 function base64ToBytes(base64: string): Uint8Array {
 	const binary = atob(base64);
