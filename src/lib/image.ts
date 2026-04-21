@@ -1,4 +1,4 @@
-const MODEL = "@cf/black-forest-labs/flux-1-schnell";
+const MODEL = "@cf/leonardo/phoenix-1.0";
 
 function base64ToBytes(base64: string): Uint8Array {
 	const binary = atob(base64);
@@ -93,7 +93,11 @@ export async function generateMealImage(
 	);
 	const response = (await ai.run(MODEL, {
 		prompt,
-		steps: 4,
+		negative_prompt: NEGATIVE_PROMPT,
+		num_steps: 20,
+		guidance: 7.5,
+		height: 1024,
+		width: 1024,
 	} as Record<string, unknown>)) as
 		| { image?: string }
 		| ReadableStream
