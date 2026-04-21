@@ -15,35 +15,35 @@ function stripPrices(text: string): string {
 		.trim();
 }
 
-const DISH_HINTS_DE: { match: RegExp; visual: string }[] = [
+const DISH_HINTS: { match: RegExp; visual: string }[] = [
 	{
-		match: /gr[üu]ne (sauce|soße)/i,
+		match: /gr[üu]ne sauce|green sauce/i,
 		visual:
-			"'Grüne Sauce' ist Frankfurter Grüne Sauce: kalte, stückige, blassgrüne Kräutersauce aus Sauerrahm mit grob zerkleinerten Eierstücken und gehackten Kräutern. Sichtbare Textur, NICHT glatt. Daneben halbierte hartgekochte Eier und halbierte Pellkartoffeln — Sauce bleibt als eigener Pool, NICHT über die Eier gegossen.",
+			"'Green sauce' here is Frankfurter Grüne Sauce: cold chunky pale mint-green sour-cream sauce with coarsely-blended boiled-egg pieces and heavy chopped fresh herbs (parsley, chervil, chives, sorrel, cress) — visible texture, NOT smooth, NOT puree. Served as a pool or small bowl BESIDE halved hard-boiled eggs and halved boiled yellow potatoes; eggs and potatoes plain and undressed, sauce stays in its own pool, never drizzled on top.",
 	},
 	{
-		match: /kartoffelsalat/i,
+		match: /kartoffelsalat|potato salad/i,
 		visual:
-			"Deutscher Kartoffelsalat: kalte, dünne 3mm-Scheiben festkochender Kartoffeln (KEINE Würfel), in Brühe-Essig- oder Mayo-Senf-Dressing, mit Schnittlauch und kleinen Gewürzgurkenstückchen.",
+			"German potato salad: cold thin 3mm coin-slices of waxy potato (NOT cubes), in a light broth-vinegar or creamy mayo-mustard dressing, chives and small diced pickles visible.",
 	},
 	{
-		match: /fleischwurst|lyoner/i,
+		match: /fleischwurst|lyoner|meat sausage/i,
 		visual:
-			"Fleischwurst ist das deutsche Äquivalent zu amerikanischer Bologna: weiche, fein emulgierte Brühwurst, gleichmäßig blassrosa Schnittfläche ohne sichtbares Korn, als dicker Ring oder dicke Scheiben. KEINE Bratwurst, KEIN Grillwürstchen.",
+			"'Fleischwurst' is the German equivalent of American bologna: soft finely-ground emulsified pork sausage, smooth uniform pale-pink interior (no grain, no visible chunks), shaped as a peeled cylindrical ring or thick flat 1cm slices. NOT bratwurst, NOT salami, NOT a hot dog, NOT grilled.",
 	},
 ];
 
 const PROMPT_LIMIT = 2048;
 
-function buildPrompt(itemDe: string): string {
-	const dish = stripPrices(itemDe);
-	const hints = DISH_HINTS_DE.filter((h) => h.match.test(dish))
+function buildPrompt(itemEn: string): string {
+	const dish = stripPrices(itemEn);
+	const hints = DISH_HINTS.filter((h) => h.match.test(dish))
 		.map((h) => h.visual)
 		.join(" ");
 	const extra = hints ? ` ${hints}` : "";
-	const prompt = `STRIKT: NUR die genannten Speisen darstellen — keine erfundenen Beilagen, keine Deko, keine Zitrone, keine Kräuter, keine Zwiebeln, kein Brot, keine Gurken, kein Salat. Leerer Platz in der Schale ist OK.
+	const prompt = `STRICT: render ONLY the food items explicitly named below — no invented sides, no garnishes, no lemon, no herb sprigs, no onion, no bread, no pickles, no lettuce. Empty tray space is fine.
 
-Handyfoto von oben: Mittagstisch aus einer kleinen deutschen Metzgerei, zum Mitnehmen: ${dish}.${extra} In einer weißen Styropor-Imbissschale auf einer Holztheke. Nichts sonst im Bild: kein Besteck, kein Deckel, keine Serviette, keine Nebencontainer, keine Getränke. Flaches grünliches Neonlicht oder billiger Handyblitz. Aufgenommen mit einem günstigen Smartphone: weicher Fokus, leichtes Bildrauschen, JPEG-Look, zentriertes Motiv, leichte Schräglage. Amateurschnappschuss. Kein Text, keine Logos.`;
+Overhead phone snapshot of a takeaway lunch from a small German neighborhood butcher (Metzgerei): ${dish}.${extra} Served in a plain open white styrofoam Imbissschale (shallow rectangular EPS clamshell base, no lid visible), on a cheap wooden counter. Nothing else in frame: no cutlery (no fork/spoon/knife), no lid, no napkin, no side containers, no drinks, no decorative garnish. Flat greenish shop fluorescent or cheap phone flash — harsh direct light, flat shadows, slight highlight blow. Handheld mid-range smartphone: soft focus, faint motion blur, visible sensor noise, compressed JPEG look, centered subject, slight tilt. Amateur snapshot, NOT food photography, NOT restaurant plating, NO shallow depth of field, NO styling, NO magazine polish. No text, no logos.`;
 	if (prompt.length > PROMPT_LIMIT) {
 		console.warn(
 			`Prompt ${prompt.length} chars exceeds ${PROMPT_LIMIT}; truncating`,
@@ -73,15 +73,15 @@ async function readStream(stream: ReadableStream): Promise<Uint8Array> {
 
 export async function generateMealImage(
 	ai: Ai,
-	itemDe: string,
+	itemEn: string,
 ): Promise<Uint8Array> {
-	if (!itemDe.trim()) {
+	if (!itemEn.trim()) {
 		throw new Error("generateMealImage: empty item");
 	}
 
-	const prompt = buildPrompt(itemDe);
+	const prompt = buildPrompt(itemEn);
 	console.log(
-		`flux prompt (${prompt.length} chars) for item "${itemDe.slice(0, 60)}"`,
+		`flux prompt (${prompt.length} chars) for item "${itemEn.slice(0, 60)}"`,
 	);
 	const response = (await ai.run(MODEL, {
 		prompt,

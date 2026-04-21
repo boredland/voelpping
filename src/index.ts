@@ -106,8 +106,8 @@ async function enrichMenu(
 	await Promise.all(
 		days.flatMap((dow) => {
 			const col = DAY_COLUMNS[dow];
-			const itemsDe = parseMealItems(meals[col]);
-			return itemsDe.map(async (item, idx) => {
+			const itemsEn = parseMealItems(mealsEn[col]);
+			return itemsEn.map(async (item, idx) => {
 				try {
 					const bytes = await generateMealImage(env.AI, item);
 					const url = await uploadMenuImage(
@@ -117,7 +117,6 @@ async function enrichMenu(
 						col,
 						idx,
 						bytes,
-						"image/png",
 					);
 					imagesByDay[dow][idx] = url;
 				} catch (e) {
