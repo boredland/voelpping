@@ -109,7 +109,11 @@ async function enrichMenu(
 			const itemsDe = parseMealItems(meals[col]);
 			return itemsDe.map(async (item, idx) => {
 				try {
-					const bytes = await generateMealImage(env.GOOGLE_AI_API_KEY, item);
+					const bytes = await generateMealImage(
+						env.GOOGLE_AI_API_KEY,
+						env.CF_AIG_TOKEN,
+						item,
+					);
 					const url = await uploadMenuImage(
 						env.MENU_IMAGES,
 						env.R2_PUBLIC_BASE_URL,
@@ -241,6 +245,7 @@ export default {
 			try {
 				const bytes = await generateMealImage(
 					env.GOOGLE_AI_API_KEY,
+					env.CF_AIG_TOKEN,
 					"Frankfurter Grüne Sauce mit Eiern und Kartoffeln",
 				);
 				return new Response(bytes, {

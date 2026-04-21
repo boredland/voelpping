@@ -7,6 +7,7 @@ export interface Env {
 	BOT_USERNAME: string;
 	DEEPL_API_KEY: string;
 	GOOGLE_AI_API_KEY: string;
+	CF_AIG_TOKEN: string;
 	R2_PUBLIC_BASE_URL: string;
 }
 

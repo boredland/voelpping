@@ -50,6 +50,7 @@ interface ImagenResponse {
 
 export async function generateMealImage(
 	googleApiKey: string,
+	gatewayToken: string,
 	itemDe: string,
 ): Promise<Uint8Array> {
 	if (!itemDe.trim()) {
@@ -67,6 +68,7 @@ export async function generateMealImage(
 		headers: {
 			"content-type": "application/json",
 			"x-goog-api-key": googleApiKey,
+			"cf-aig-authorization": `Bearer ${gatewayToken}`,
 		},
 		body: JSON.stringify({
 			instances: [{ prompt }],
