@@ -1,6 +1,6 @@
 const GATEWAY_BASE =
 	"https://gateway.ai.cloudflare.com/v1/cd1e88db5a44de0f45317275cbcef879/default/google-ai-studio";
-const MODEL = "gemini-2.5-flash-image";
+const MODEL = "gemini-3.1-flash-image-preview";
 
 function stripPrices(text: string): string {
 	return text
