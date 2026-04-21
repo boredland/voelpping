@@ -23,7 +23,7 @@ function buildPrompt(itemsEn: string[]): string {
 		.map((h) => h.hint)
 		.join(" ");
 	const extra = hints ? ` ${hints}` : "";
-	return `Appetizing food photography of a German lunch plate: ${dish}.${extra} Warm natural lighting, overhead angle, restaurant plating, shallow depth of field, no text, no logos, no watermarks.`;
+	return `Casual overhead smartphone snapshot of a daily lunch special from a small German neighborhood butcher shop (Metzgerei), packed for takeaway: ${dish}.${extra} Served in a disposable takeaway container — a paper tray, compostable kraft bowl, or clear plastic Imbiss container with a clip-on lid — placed on a plain shop counter or simple wooden surface. Honest portion sizes, home-style plating, nothing fancy. Lit with the flat mixed fluorescent and daylight of a small shop interior. Shot on a mid-range smartphone: slightly compressed dynamic range, modest depth of field, subtle sensor noise, everything roughly in focus, amateur framing. Not professional food photography, not a restaurant plate, not glossy magazine styling. No text, no logos, no watermarks.`;
 }
 
 export async function generateMealImage(
