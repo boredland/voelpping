@@ -1,4 +1,4 @@
-const MODEL = "@cf/bytedance/stable-diffusion-xl-lightning";
+const MODEL = "@cf/black-forest-labs/flux-1-schnell";
 
 function base64ToBytes(base64: string): Uint8Array {
 	const binary = atob(base64);
@@ -93,10 +93,7 @@ export async function generateMealImage(
 	);
 	const response = (await ai.run(MODEL, {
 		prompt,
-		negative_prompt: NEGATIVE_PROMPT,
-		num_steps: 8,
-		height: 1024,
-		width: 1024,
+		steps: 4,
 	} as Record<string, unknown>)) as
 		| { image?: string }
 		| ReadableStream
