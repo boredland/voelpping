@@ -152,9 +152,6 @@ async function scrapeAndStore(
 	db: ReturnType<typeof createDb>,
 	env: Env,
 ): Promise<void> {
-	const candidates = await findMenuImageCandidates();
-	if (candidates.length === 0) return;
-
 	const weekTuesday = getCurrentWeekTuesday();
 	const existing = await db
 		.select()
@@ -162,18 +159,15 @@ async function scrapeAndStore(
 		.where(eq(menus.weekStart, weekTuesday))
 		.limit(1);
 
-	// Short-circuit if the newest candidate matches what we already stored.
-	if (existing.length > 0 && existing[0].imageUrl === candidates[0]) {
-		console.log("Menu already stored for this week");
+	if (existing.length > 0 && existing[0].imageUrl) {
+		console.log(`Menu already stored for week ${weekTuesday}, skipping scrape`);
 		return;
 	}
 
-	for (const imageUrl of candidates) {
-		if (existing.length > 0 && existing[0].imageUrl === imageUrl) {
-			console.log(`Skipping candidate ${imageUrl} — already stored`);
-			return;
-		}
+	const candidates = await findMenuImageCandidates();
+	if (candidates.length === 0) return;
 
+	for (const imageUrl of candidates) {
 		const stored = await storeMenuForUrl(db, env, imageUrl, weekTuesday);
 		if (stored) return;
 		console.log("Candidate is not a menu, trying next");
